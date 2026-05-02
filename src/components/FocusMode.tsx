@@ -11,11 +11,11 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
-import { DisciplineState, getDisciplineRequirements, updateDiscipline } from '../services/behavioralEngine';
+import { DisciplineState, getDisciplineRequirements, updateDiscipline, detectDopamineLoops } from '../services/behavioralEngine';
 import { useProductivity } from '../ProductivityContext';
 
 export default function FocusMode() {
-  const { startSession, endSession, activeSession } = useProductivity();
+  const { startSession, endSession, activeSession, engagements, recordEngagment } = useProductivity();
   const [discipline, setDiscipline] = useState<DisciplineState>({
     level: 'Bronze',
     progressionPoints: 240,
@@ -32,6 +32,8 @@ export default function FocusMode() {
   const [blockedSites, setBlockedSites] = useState(['twitter.com', 'facebook.com', 'reddit.com', 'youtube.com']);
   const [newSite, setNewSite] = useState('');
   const [showDopamineWarning, setShowDopamineWarning] = useState(false);
+  const [dopamineReason, setDopamineReason] = useState('');
+  const [isCooldown, setIsCooldown] = useState(false);
   const [suggestion, setSuggestion] = useState<{ type: 'site' | 'duration', value: string } | null>(null);
   const [overrideTimeLeft, setOverrideTimeLeft] = useState(0);
   const [isOverridePending, setIsOverridePending] = useState(false);
@@ -85,30 +87,85 @@ export default function FocusMode() {
     setDiscipline(prev => updateDiscipline(prev, false));
   };
 
-  // Simulation: Dopamine loop detection & Adaptive Suggestions
+  // Real-time Dopamine Loop Detection & Simulation
   useEffect(() => {
-    let timer: any;
-    if (isActive) {
-      timer = setInterval(() => {
-        if (Math.random() > 0.92) {
-          setShowDopamineWarning(true);
-          
-          // Generate an adaptive suggestion based on current state
-          if (Math.random() > 0.5) {
-            setSuggestion({ type: 'site', value: 'news.ycombinator.com' });
-          } else {
-            setSuggestion({ type: 'duration', value: '10' });
-          }
+    if (!isActive || isCooldown) return;
 
-          setTimeout(() => {
-            setShowDopamineWarning(false);
-            setSuggestion(null);
-          }, 8000);
+    // Simulation: Periodically generate random engagements to test the system
+    // In a real extension, these would be real tab switches
+    const simulationInterval = setInterval(() => {
+      const domains = ['twitter.com', 'reddit.com', 'youtube.com', 'news.ycombinator.com', 'github.com'];
+      const randomDomain = domains[Math.floor(Math.random() * domains.length)];
+      // Force a "micro-stay" simulation occasionally
+      const duration = Math.random() > 0.7 ? Math.floor(Math.random() * 4) + 1 : Math.floor(Math.random() * 60) + 10;
+      
+      recordEngagment({
+        domain: randomDomain,
+        timestamp: Date.now(),
+        duration
+      });
+    }, 8000); // Record a new "engagement" every 8s
+
+    const analysis = detectDopamineLoops(engagements);
+    if (analysis.detected) {
+      setShowDopamineWarning(true);
+      setDopamineReason(analysis.reason || 'Rapid switching detected');
+      
+      // Smart Suggestion Logic
+      if (!suggestion) {
+        const recent = engagements.slice(0, 10);
+        if (recent.length > 0) {
+          const domainCounts: Record<string, number> = {};
+          recent.forEach(e => {
+            domainCounts[e.domain] = (domainCounts[e.domain] || 0) + 1;
+          });
+          
+          const sortedDomains = Object.entries(domainCounts)
+            .sort((a, b) => b[1] - a[1]);
+          
+          const mostFrequent = sortedDomains[0]?.[0];
+          const productiveDomains = ['github.com', 'stackoverflow.com', 'docs.google.com', 'notion.so', 'figma.com', 'linear.app', 'vercel.com'];
+          const isProductive = productiveDomains.some(d => mostFrequent?.includes(d));
+
+          if (isProductive) {
+            setSuggestion({ type: 'duration', value: '15' });
+          } else if (mostFrequent && !blockedSites.includes(mostFrequent)) {
+            // Only suggest if it's not already blocked and not a productive domain
+            setSuggestion({ type: 'site', value: mostFrequent });
+          }
         }
-      }, 10000);
+      }
+      
+      // Auto-hide after 20s if not interacted with
+      const timer = setTimeout(() => {
+        setShowDopamineWarning(false);
+      }, 20000);
+
+      return () => {
+        clearTimeout(timer);
+        clearInterval(simulationInterval);
+      };
     }
-    return () => clearInterval(timer);
-  }, [isActive]);
+    
+    return () => clearInterval(simulationInterval);
+  }, [isActive, engagements, isCooldown, recordEngagment]);
+
+  const resetFocus = () => {
+    setShowDopamineWarning(false);
+    setIsCooldown(true);
+    // 1-minute cooldown before next warning
+    setTimeout(() => setIsCooldown(false), 60 * 1000);
+    
+    // Boost time slightly as positive reinforcement for "resetting"
+    setTimeLeft(prev => Math.min(requirements.sessionDuration * 60, prev + 30));
+  };
+
+  const continueBrowsing = () => {
+    setShowDopamineWarning(false);
+    setIsCooldown(true);
+    // Longer 3-minute cooldown if they choose to continue anyway
+    setTimeout(() => setIsCooldown(false), 3 * 60 * 1000);
+  };
 
   const addSite = (e: React.FormEvent) => {
     e.preventDefault();
@@ -166,43 +223,75 @@ export default function FocusMode() {
                 </span>
               )}
             </div>
-            <div className="flex flex-col gap-2 mt-2">
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <div className="flex gap-1">
-                    {[1, 2, 3, 4, 5].map((i) => (
-                      <div key={i} className={cn(
-                        "w-4 h-1.5 rounded-full transition-all duration-500",
-                        i <= discipline.consecutiveSuccesses 
-                          ? "bg-aura-primary shadow-[0_0_8px_rgba(196,164,132,0.6)]" 
-                          : "bg-aura-border"
-                      )} />
-                    ))}
+            <div className="flex flex-col gap-3 mt-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <div className="flex gap-1.5">
+                      {[1, 2, 3, 4, 5].map((i) => (
+                        <div key={i} className={cn(
+                          "w-5 h-1.5 rounded-full transition-all duration-500",
+                          i <= discipline.consecutiveSuccesses 
+                            ? "bg-aura-primary shadow-[0_0_8px_rgba(196,164,132,0.4)]" 
+                            : "bg-aura-border/40"
+                        )} />
+                      ))}
+                    </div>
+                    <p className="text-[10px] text-aura-text-muted uppercase font-bold tracking-widest">
+                      Focus Streak
+                    </p>
                   </div>
-                  <p className="text-[10px] text-aura-text-muted uppercase font-bold tracking-widest min-w-[70px]">
-                    Focus Streak
-                  </p>
                 </div>
-                <div className="h-3 w-px bg-aura-border" />
-                <p className="text-[10px] text-aura-primary uppercase font-bold tracking-widest">
-                  {discipline.progressionPoints} Points
-                </p>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-sm font-bold text-aura-primary tabular-nums">{discipline.progressionPoints}</span>
+                  <span className="text-[9px] text-aura-text-muted uppercase font-bold tracking-tighter">Points Earned</span>
+                </div>
               </div>
 
-              <div className="flex items-center gap-2">
+              {/* Advanced Progression Bar */}
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-end px-0.5">
+                  <p className="text-[9px] text-aura-text-muted uppercase font-black tracking-widest">
+                    Next Level Progression
+                  </p>
+                  <p className="text-[10px] font-bold text-aura-primary">
+                    {discipline.consecutiveSuccesses}/5 Sessions
+                  </p>
+                </div>
+                <div className="h-2 w-full bg-aura-bg border border-aura-border rounded-full overflow-hidden relative">
+                  <motion.div 
+                    initial={{ width: 0 }}
+                    animate={{ width: `${(discipline.consecutiveSuccesses / 5) * 100}%` }}
+                    className="h-full bg-aura-primary relative z-10"
+                  />
+                  {/* Subtle Grid markers */}
+                  <div className="absolute inset-0 flex justify-between px-[20%]">
+                    {[1, 2, 3, 4].map(i => (
+                      <div key={i} className="h-full w-px bg-aura-border/30" />
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-1 border-t border-aura-border/30">
+                <p className="text-[9px] text-aura-text-muted uppercase font-bold tracking-widest">
+                  Recent Breaks
+                </p>
                 <div className="flex gap-1">
                   {[1, 2, 3].map((i) => (
                     <div key={i} className={cn(
-                      "w-4 h-1.5 rounded-full transition-all duration-500",
+                      "w-3 h-1 rounded-full transition-all duration-500",
                       i <= discipline.consecutiveBreaks 
-                        ? "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.4)]" 
-                        : "bg-aura-border"
+                        ? "bg-red-500/80 shadow-[0_0_6px_rgba(239,68,68,0.3)]" 
+                        : "bg-aura-border/30"
                     )} />
                   ))}
                 </div>
-                <p className="text-[10px] text-aura-text-muted uppercase font-bold tracking-widest">
-                  Recent Breaks {discipline.consecutiveBreaks > 0 && `(${discipline.consecutiveBreaks}/3)`}
-                </p>
+                {discipline.consecutiveBreaks > 0 && (
+                  <p className="text-[9px] text-red-500 font-bold uppercase tracking-tighter ml-1">
+                    {discipline.consecutiveBreaks}/3 Limit
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -231,31 +320,43 @@ export default function FocusMode() {
         </AnimatePresence>
 
         {/* Dopamine Warning Overlay & Adaptive Suggestions */}
-        {showDopamineWarning && (
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.9, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.9, y: 20 }}
-            className="absolute -top-16 z-50 flex flex-col gap-2 items-center"
-          >
-            <div className="bg-red-500 text-white px-6 py-2 rounded-sm shadow-2xl flex items-center gap-4 border border-red-400">
-              <div className="flex items-center gap-3">
-                <AlertTriangle className="w-4 h-4" />
-                <span className="text-[10px] uppercase font-black tracking-[0.2em]">Don't switch tabs!</span>
+        <AnimatePresence>
+          {showDopamineWarning && (
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="absolute -top-32 z-50 flex flex-col gap-2 items-center"
+            >
+              <div className="bg-red-500 text-white px-6 py-4 rounded-sm shadow-2xl flex flex-col items-center gap-3 border border-red-400 max-w-[340px] text-center">
+                <div className="flex flex-col items-center gap-2">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+                    <span className="text-xs uppercase font-black tracking-[0.2em]">Dopamine Loop Detected</span>
+                  </div>
+                  <p className="text-[10px] leading-relaxed opacity-90 font-medium">
+                    {dopamineReason.includes("under 5 seconds") || dopamineReason.includes("Rapid switching")
+                      ? "You seem to be switching tabs very quickly! This can fragment your focus." 
+                      : "Your browsing pattern suggests a dopamine loop. Try to slow down."}
+                  </p>
+                </div>
+                <div className="flex flex-col gap-2 w-full mt-1">
+                  <button 
+                    onClick={resetFocus}
+                    className="w-full bg-white text-red-500 hover:bg-white/90 px-4 py-2 rounded-sm text-[10px] uppercase font-black tracking-widest transition-all font-sans shadow-lg"
+                  >
+                    Reset Focus
+                  </button>
+                  <button 
+                    onClick={continueBrowsing}
+                    className="w-full bg-white/10 hover:bg-white/20 px-4 py-2 rounded-sm text-[9px] uppercase font-bold tracking-widest border border-white/10 transition-all font-sans"
+                  >
+                    Continue Browsing
+                  </button>
+                </div>
               </div>
-              <button 
-                onClick={() => {
-                  setTimeLeft(requirements.sessionDuration * 60);
-                  setShowDopamineWarning(false);
-                  setSuggestion(null);
-                }}
-                className="bg-aura-bg/20 hover:bg-aura-bg/40 px-3 py-1 rounded-sm text-[8px] uppercase font-bold tracking-widest border border-white/20 transition-all"
-              >
-                Refresh
-              </button>
-            </div>
-            
-            {suggestion && (
+              
+              {suggestion && (
               <motion.div 
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -291,6 +392,7 @@ export default function FocusMode() {
             )}
           </motion.div>
         )}
+      </AnimatePresence>
 
         <div className="relative w-80 h-80 flex items-center justify-center">
           {/* Animated Glow */}
