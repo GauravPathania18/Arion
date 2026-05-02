@@ -1,11 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   Sparkles, 
   ExternalLink,
-  Plus,
   RefreshCw, 
   BrainCircuit, 
-  Calendar,
+  Calendar, 
   AlertCircle,
   CheckCircle2
 } from 'lucide-react';
@@ -13,28 +12,29 @@ import ReactMarkdown from 'react-markdown';
 import { motion } from 'motion/react';
 import { generateProductivityInsights } from '../services/geminiService';
 import { cn } from '../lib/utils';
+import { useProductivity } from '../ProductivityContext';
 
 export default function Insights() {
+  const { currentMetrics, siteUsage, history } = useProductivity();
   const [loading, setLoading] = useState(false);
   const [insight, setInsight] = useState<string | null>(null);
 
-  const mockData = {
-    date: '2026-05-02',
-    totalActiveTime: 28800,
-    focusScore: 82,
-    sites: []
-  };
-
-  const mockMetrics = {
-    tabSwitchFrequency: 8.5,
-    dopamineLoopDetected: true,
-    procrastinationScore: 35
-  };
+  const realData = useMemo(() => {
+    if (history.length > 0) return history;
+    
+    // Construct single DayData for today
+    return [{
+      date: new Date().toISOString().split('T')[0],
+      totalActiveTime: siteUsage.reduce((acc, s) => acc + s.timeSpent, 0),
+      focusScore: 82, // Base score
+      sites: siteUsage
+    }];
+  }, [history, siteUsage]);
 
   const handleGenerate = async () => {
     setLoading(true);
     try {
-      const result = await generateProductivityInsights([mockData], mockMetrics);
+      const result = await generateProductivityInsights(realData, currentMetrics);
       setInsight(result);
     } catch (e) {
       setInsight("Error generating insights.");

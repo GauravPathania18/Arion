@@ -5,10 +5,7 @@ import {
   BrainCircuit, 
   Settings as SettingsIcon, 
   Chrome, 
-  ShieldAlert,
   Zap,
-  Clock,
-  ExternalLink
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Dashboard from './components/Dashboard';
@@ -17,9 +14,29 @@ import Insights from './components/Insights';
 import Settings from './components/Settings';
 import ExtensionCode from './components/ExtensionCode';
 import { cn } from './lib/utils';
+import { ProductivityProvider, useProductivity } from './ProductivityContext';
 
-export default function App() {
+function AppContent() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'focus' | 'insights' | 'settings' | 'extension'>('dashboard');
+  const { recordEngagment, recordSiteUsage } = useProductivity();
+
+  // "Real Data Ready" Simulation: Feeding live usage data into the system
+  useEffect(() => {
+    const simulationInterval = setInterval(() => {
+      const sites = ['github.com', 'stackoverflow.com', 'youtube.com', 'twitter.com', 'news.ycombinator.com'];
+      const randomSite = sites[Math.floor(Math.random() * sites.length)];
+      const duration = Math.floor(Math.random() * 60) + 10; // 10-70 seconds
+      
+      recordSiteUsage(randomSite, duration);
+      recordEngagment({
+        domain: randomSite,
+        timestamp: Date.now(),
+        duration
+      });
+    }, 15000); // Every 15 seconds simulate a new site engagement
+
+    return () => clearInterval(simulationInterval);
+  }, [recordEngagment, recordSiteUsage]);
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -93,5 +110,13 @@ export default function App() {
         </AnimatePresence>
       </main>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <ProductivityProvider>
+      <AppContent />
+    </ProductivityProvider>
   );
 }

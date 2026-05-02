@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { 
   AreaChart, 
   Area, 
@@ -14,7 +14,6 @@ import {
 import { 
   Zap, 
   Clock, 
-  ArrowUpRight, 
   ArrowDownRight,
   Monitor,
   MousePointer2,
@@ -23,9 +22,11 @@ import {
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
-import { calculateFocusScore, TabEngagement } from '../services/behavioralEngine';
+import { calculateFocusScore } from '../services/behavioralEngine';
+import { useProductivity } from '../ProductivityContext';
 
-const focusHistory = [
+// Default history if none exists in context
+const defaultHistory = [
   { time: '9 AM', focus: 85, distractions: 12 },
   { time: '11 AM', focus: 92, distractions: 5 },
   { time: '1 PM', focus: 65, distractions: 28 },
@@ -35,30 +36,57 @@ const focusHistory = [
   { time: '9 PM', focus: 30, distractions: 60 },
 ];
 
-const categoryData = [
-  { name: 'Productive', value: 65, color: '#C4A484' },
-  { name: 'Distracting', value: 25, color: '#ef4444' },
-  { name: 'Neutral', value: 10, color: '#3f3f46' },
-];
-
-const mockEngagements: TabEngagement[] = [
-  { domain: 'twitter.com', timestamp: Date.now() - 5000, duration: 5 },
-  { domain: 'reddit.com', timestamp: Date.now() - 15000, duration: 8 },
-  { domain: 'facebook.com', timestamp: Date.now() - 25000, duration: 4 },
-  { domain: 'youtube.com', timestamp: Date.now() - 35000, duration: 12 },
-  { domain: 'instagram.com', timestamp: Date.now() - 45000, duration: 6 },
-  { domain: 'tiktok.com', timestamp: Date.now() - 55000, duration: 3 },
-  { domain: 'gmail.com', timestamp: Date.now() - 100000, duration: 120 },
-];
-
 export default function Dashboard() {
-  const currentScore = calculateFocusScore(
-    310, // productive minutes
-    45,  // distracting minutes
-    [{ startTime: Date.now() - 100000, duration: 25, completed: true, distractionsBlocked: 5 }],
-    { tabSwitchFrequency: 8.5, dopamineLoopDetected: true, procrastinationScore: 35 },
-    mockEngagements
-  );
+  const { currentMetrics, siteUsage, engagements, activeSession, history } = useProductivity();
+
+  const currentScore = useMemo(() => calculateFocusScore(
+    310, // In a real app, this would be computed from siteUsage
+    45,  
+    activeSession ? [activeSession] : [],
+    currentMetrics,
+    engagements
+  ), [currentMetrics, engagements, activeSession]);
+
+  const categoryData = useMemo(() => {
+    if (siteUsage.length === 0) {
+      return [
+        { name: 'Productive', value: 65, color: '#C4A484' },
+        { name: 'Distracting', value: 25, color: '#ef4444' },
+        { name: 'Neutral', value: 10, color: '#3f3f46' },
+      ];
+    }
+
+    // Map site categories (simulated categorization)
+    const productiveSites = ['github.com', 'stackoverflow.com', 'notion.so', 'figma.com'];
+    const distractingSites = ['twitter.com', 'youtube.com', 'facebook.com', 'reddit.com', 'instagram.com'];
+
+    let productiveTime = 0;
+    let distractingTime = 0;
+    let neutralTime = 0;
+
+    siteUsage.forEach(site => {
+      if (productiveSites.includes(site.domain)) productiveTime += site.timeSpent;
+      else if (distractingSites.includes(site.domain)) distractingTime += site.timeSpent;
+      else neutralTime += site.timeSpent;
+    });
+
+    const total = productiveTime + distractingTime + neutralTime;
+    return [
+      { name: 'Productive', value: Math.round((productiveTime / total) * 100) || 0, color: '#C4A484' },
+      { name: 'Distracting', value: Math.round((distractingTime / total) * 100) || 0, color: '#ef4444' },
+      { name: 'Neutral', value: Math.round((neutralTime / total) * 100) || 0, color: '#3f3f46' },
+    ];
+  }, [siteUsage]);
+
+  // Transform real history to chart format if needed, or use default
+  const chartData = useMemo(() => {
+    if (history.length === 0) return defaultHistory;
+    return history.map(day => ({
+      time: day.date,
+      focus: day.focusScore,
+      distractions: 100 - day.focusScore // Approximation for chart
+    }));
+  }, [history]);
 
   return (
     <div className="space-y-8">
@@ -66,9 +94,9 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {[
           { label: 'Live Focus Score', value: currentScore.toString(), suffix: '/100', icon: Zap, trend: '+5%', trendUp: true },
-          { label: 'Deep Work', value: '5.2', suffix: 'hrs', icon: Clock, trend: '+1.2', trendUp: true },
-          { label: 'Distracted Time', value: '48', suffix: 'min', icon: ArrowDownRight, trend: '-15%', trendUp: true },
-          { label: 'Behavioral Index', value: '8.5', suffix: 'sw/m', icon: Timer, trend: 'High', trendUp: false },
+          { label: 'Deep Work', value: activeSession ? (activeSession.duration / 60).toFixed(1) : '0.0', suffix: 'hrs', icon: Clock, trend: '+1.2', trendUp: true },
+          { label: 'Distracted Time', value: Math.round(siteUsage.reduce((acc, s) => acc + s.timeSpent, 0) / 60).toString(), suffix: 'min', icon: ArrowDownRight, trend: '-15%', trendUp: true },
+          { label: 'Tab Switches', value: currentMetrics.tabSwitchFrequency.toFixed(1), suffix: 'sw/m', icon: Timer, trend: currentMetrics.tabSwitchFrequency > 5 ? 'High' : 'Stable', trendUp: currentMetrics.tabSwitchFrequency < 5 },
         ].map((stat, i) => (
           <motion.div 
             initial={{ opacity: 0, y: 10 }}
@@ -119,7 +147,7 @@ export default function Dashboard() {
             </div>
           </div>
           <ResponsiveContainer width="100%" height="85%">
-            <AreaChart data={focusHistory}>
+            <AreaChart data={chartData}>
               <defs>
                 <linearGradient id="colorFocus" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#C4A484" stopOpacity={0.3}/>
@@ -207,27 +235,31 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-aura-card border border-aura-border p-6 rounded-sm">
           <div className="flex items-center gap-3 mb-6">
-            <div className="p-2 bg-amber-500/10 rounded-lg">
-              <Monitor className="w-5 h-5 text-amber-500" />
+            <div className={cn("p-2 rounded-lg", currentMetrics.dopamineLoopDetected ? "bg-red-500/10" : "bg-aura-primary/10")}>
+              <Monitor className={cn("w-5 h-5", currentMetrics.dopamineLoopDetected ? "text-red-500" : "text-aura-primary")} />
             </div>
             <div>
-              <h3 className="font-semibold">Dopamine Loop Detected</h3>
-              <p className="text-xs text-zinc-500">Pattern identified in last 15 minutes</p>
+              <h3 className="font-semibold">{currentMetrics.dopamineLoopDetected ? "Dopamine Loop Detected" : "Healthy Pattern"}</h3>
+              <p className="text-xs text-zinc-500">Real-time behavior analysis</p>
             </div>
           </div>
           <div className="space-y-4">
             <div className="p-4 bg-aura-bg border border-aura-border rounded-sm flex items-start gap-3">
               <MousePointer2 className="w-4 h-4 text-zinc-400 mt-1" />
               <div>
-                <p className="text-sm font-medium">Frequent Tab Switching</p>
+                <p className="text-sm font-medium">Tab Flow Analysis</p>
                 <p className="text-xs text-zinc-500 mt-1 leading-relaxed">
-                  You switched between 12 different domains in the last 5 minutes. This pattern often indicates procrastination or "search-panic".
+                  {currentMetrics.dopamineLoopDetected 
+                    ? `You've switched tabs frequently in the last few minutes. This pattern often indicates high stimulation seeking.`
+                    : "Your browsing behavior is focused and intentional. Keep up the high-quality flow."}
                 </p>
               </div>
             </div>
-            <button className="w-full py-2 bg-amber-500/10 text-amber-500 text-xs font-semibold rounded-lg hover:bg-amber-500/20 transition-colors">
-              Activate Micro-Focus Session
-            </button>
+            {currentMetrics.dopamineLoopDetected && (
+              <button className="w-full py-2 bg-red-500/10 text-red-500 text-xs font-semibold rounded-lg hover:bg-red-500/20 transition-colors">
+                Force Deep Work Session
+              </button>
+            )}
           </div>
         </div>
 
@@ -237,8 +269,8 @@ export default function Dashboard() {
               <Brain className="w-5 h-5 text-aura-primary" />
             </div>
             <div>
-              <h3 className="font-serif italic tracking-wide">AI Behavioral Score</h3>
-              <p className="text-xs text-zinc-500">Calculated by Pulse Intelligence</p>
+              <h3 className="font-serif italic tracking-wide">AI Focus Score</h3>
+              <p className="text-xs text-zinc-500">Pulse Intelligence metrics</p>
             </div>
           </div>
           <div className="flex items-center gap-8">
@@ -257,27 +289,31 @@ export default function Dashboard() {
                   stroke="currentColor" 
                   strokeWidth="8" 
                   strokeDasharray={2 * Math.PI * 40}
-                  strokeDashoffset={2 * Math.PI * 40 * (1 - 0.74)}
+                  strokeDashoffset={2 * Math.PI * 40 * (1 - currentScore / 100)}
                   className="text-aura-primary"
                 />
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-2xl font-serif text-aura-primary">74</span>
+                <span className="text-2xl font-serif text-aura-primary">{currentScore}</span>
                 <span className="text-[10px] text-aura-text-muted uppercase font-bold tracking-widest">Score</span>
               </div>
             </div>
             <div className="flex-1 space-y-3">
               <div className="text-[10px] uppercase tracking-widest font-bold">
-                <span className="text-aura-text-muted">Biological Peak:</span>
-                <span className="ml-2 text-aura-primary">10:30 AM — 12:00 PM</span>
+                <span className="text-aura-text-muted">Stability:</span>
+                <span className={cn("ml-2", currentScore > 70 ? "text-aura-primary" : "text-amber-500")}>
+                  {currentScore > 90 ? 'Perfect' : currentScore > 70 ? 'Strong' : 'Fragile'}
+                </span>
               </div>
               <div className="text-[10px] uppercase tracking-widest font-bold">
-                <span className="text-aura-text-muted">Context Switching:</span>
-                <span className="ml-2 text-red-400">High (+22%)</span>
+                <span className="text-aura-text-muted">Context Switches:</span>
+                <span className={cn("ml-2", currentMetrics.tabSwitchFrequency > 5 ? "text-red-400" : "text-aura-primary")}>
+                  {currentMetrics.tabSwitchFrequency > 10 ? 'Critical' : currentMetrics.tabSwitchFrequency > 5 ? 'High' : 'Low'}
+                </span>
               </div>
               <div className="text-[10px] uppercase tracking-widest font-bold">
-                <span className="text-aura-text-muted">Focus Stamina:</span>
-                <span className="ml-2 text-aura-primary">Strong (45 mins avg)</span>
+                <span className="text-aura-text-muted">Stamina Index:</span>
+                <span className="ml-2 text-aura-primary">Stable</span>
               </div>
             </div>
           </div>

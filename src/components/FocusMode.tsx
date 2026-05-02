@@ -4,18 +4,18 @@ import {
   Pause, 
   RotateCcw, 
   Shield, 
-  ShieldOff,
   Coffee,
   AlertTriangle,
-  ChevronRight,
   TrendingUp,
   Trophy
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
 import { DisciplineState, getDisciplineRequirements, updateDiscipline } from '../services/behavioralEngine';
+import { useProductivity } from '../ProductivityContext';
 
 export default function FocusMode() {
+  const { startSession, endSession, activeSession } = useProductivity();
   const [discipline, setDiscipline] = useState<DisciplineState>({
     level: 'Bronze',
     progressionPoints: 240,
@@ -37,6 +37,15 @@ export default function FocusMode() {
   const [isOverridePending, setIsOverridePending] = useState(false);
   const [overrideReason, setOverrideReason] = useState('');
   const [isOverrideSuccess, setIsOverrideSuccess] = useState(false);
+
+  // Sync isActive with activeSession from context
+  useEffect(() => {
+    if (activeSession && !isActive) {
+      setIsActive(true);
+    } else if (!activeSession && isActive) {
+      setIsActive(false);
+    }
+  }, [activeSession]);
 
   // Simulation: Override Timer Logic
   useEffect(() => {
@@ -128,10 +137,11 @@ export default function FocusMode() {
       }, 1000);
     } else if (timeLeft === 0 && isActive) {
       setIsActive(false);
+      endSession(true);
       setDiscipline(prev => updateDiscipline(prev, true));
     }
     return () => clearInterval(interval);
-  }, [isActive, timeLeft]);
+  }, [isActive, timeLeft, endSession]);
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -293,8 +303,10 @@ export default function FocusMode() {
             onClick={() => {
               if (isActive) {
                 setDiscipline(prev => updateDiscipline(prev, false));
+                endSession(false);
+              } else {
+                startSession(requirements.sessionDuration);
               }
-              setIsActive(!isActive);
             }}
             className="w-16 h-16 rounded-sm bg-aura-primary text-aura-bg flex items-center justify-center hover:scale-105 transition-transform active:scale-95 shadow-2xl shadow-aura-primary/20"
           >
@@ -302,9 +314,11 @@ export default function FocusMode() {
           </button>
           <button 
             onClick={() => { 
-                if (isActive) setDiscipline(prev => updateDiscipline(prev, false));
+                if (isActive) {
+                  setDiscipline(prev => updateDiscipline(prev, false));
+                  endSession(false);
+                }
                 setTimeLeft(requirements.sessionDuration * 60); 
-                setIsActive(false); 
             }}
             className="w-12 h-12 rounded-sm bg-aura-bg border border-aura-border text-aura-text-muted flex items-center justify-center hover:text-aura-text-bright transition-colors"
           >
