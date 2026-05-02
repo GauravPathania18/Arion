@@ -1,0 +1,25 @@
+@import url('https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400..900;1,6..96,400..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-serif: "Bodoni Moda", "Georgia", serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  
+  --color-aura-primary: #C4A484;
+  --color-aura-bg: #050505;
+  --color-aura-card: #121212;
+  --color-aura-border: #262626;
+  --color-aura-text-muted: #888888;
+  --color-aura-text-bright: #E5E5E5;
+}
+
+@layer base {
+  body {
+    @apply bg-aura-bg text-aura-text-bright font-sans antialiased;
+  }
+  
+  h1, h2, h3, .font-serif {
+    @apply font-serif;
+  }
+}
