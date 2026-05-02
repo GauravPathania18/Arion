@@ -18,6 +18,7 @@ export interface DisciplineState {
 /**
  * Refined Dopamine Loop Detection
  * Penalizes rapid switching between different high-stimulation domains.
+ * Specifically targets "micro-stays" (< 5s) and rapid engagement gaps.
  */
 export function detectDopamineLoops(engagements: TabEngagement[]): { 
   detected: boolean; 
@@ -32,22 +33,51 @@ export function detectDopamineLoops(engagements: TabEngagement[]): {
   // Look at the last 10 engagements (last few minutes of behavior)
   const window = sorted.slice(0, 10);
   
-  // Definition: A loop is a sequence of short stays (< 30s) across multiple unique domains
+  // Categorize stays
+  const microStays = window.filter(e => e.duration < 5);
   const shortStays = window.filter(e => e.duration < 30);
   const uniqueDomains = new Set(window.map(e => e.domain)).size;
+
+  // Calculate gaps between transitions
+  let totalGap = 0;
+  for (let i = 0; i < window.length - 1; i++) {
+    // Gap in seconds
+    const gap = Math.abs(window[i].timestamp - window[i+1].timestamp) / 1000;
+    totalGap += gap;
+  }
+  const avgGap = totalGap / (window.length - 1);
   
-  // High switch frequency + short stays + multiple domains = Loop
-  if (shortStays.length >= 6 && uniqueDomains >= 3) {
-    const avgDuration = shortStays.reduce((acc, e) => acc + e.duration, 0) / shortStays.length;
+  // Recognition logic: Loop is detected if user is bouncing between unique sites or 
+  // having many extremely short engagements in a row.
+  const isLoop = (shortStays.length >= 6 && uniqueDomains >= 3) || 
+                 (microStays.length >= 4 && uniqueDomains >= 2) ||
+                 (avgGap < 15 && shortStays.length >= 5);
+
+  if (isLoop) {
+    // Severity Calculation:
+    // 1. Base on count of micro-stays (highest penalty)
+    // 2. Base on breadth of sites
+    // 3. Base on how fast the switching is (avgGap)
+    let severity = (microStays.length * 12) + (shortStays.length * 4) + (uniqueDomains * 5);
     
-    // Severity scales inversely with average duration
-    // If avg is 5s, severity is higher than if avg is 25s
-    const severity = Math.min(100, (30 - avgDuration) * 4);
+    // Extra penalty for extremely narrow gaps (panic switching)
+    if (avgGap < 10) {
+      severity += (10 - avgGap) * 4;
+    }
+
+    severity = Math.min(100, severity);
+    
+    let reason = `Rapid switching detected (Avg: ${Math.round(avgGap)}s gaps between sites).`;
+    if (microStays.length >= 4) {
+      reason = `Micro-loop identified: ${microStays.length} visits under 5 seconds across ${uniqueDomains} sites.`;
+    } else if (uniqueDomains >= 4) {
+      reason = `Attention fragmentation: Extreme site hopping detected.`;
+    }
     
     return {
       detected: true,
       severity,
-      reason: `Rapid switching detected (Avg: ${Math.round(avgDuration)}s per site across ${uniqueDomains} domains).`
+      reason
     };
   }
 
