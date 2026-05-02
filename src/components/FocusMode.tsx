@@ -9,7 +9,7 @@ import {
   TrendingUp,
   Trophy
 } from 'lucide-react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { DisciplineState, getDisciplineRequirements, updateDiscipline } from '../services/behavioralEngine';
 import { useProductivity } from '../ProductivityContext';
@@ -147,6 +147,7 @@ export default function FocusMode() {
   };
 
   const progress = (timeLeft / (requirements.sessionDuration * 60)) * 100;
+  const isLastMinute = timeLeft <= 60 && timeLeft > 0;
 
   return (
     <div className="max-w-4xl mx-auto space-y-12 py-8">
@@ -214,6 +215,21 @@ export default function FocusMode() {
 
       {/* Timer Section */}
       <div className="flex flex-col items-center justify-center relative">
+        {/* Completion Success Toast */}
+        <AnimatePresence>
+          {timeLeft === 0 && !isActive && discipline.consecutiveSuccesses > 0 && (
+            <motion.div 
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="absolute -top-12 z-50 bg-aura-primary text-aura-bg px-6 py-2 rounded-sm shadow-2xl flex items-center gap-3"
+            >
+              <Trophy className="w-4 h-4" />
+              <span className="text-[10px] uppercase font-black tracking-widest">Session Complete +25 Points</span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Dopamine Warning Overlay & Adaptive Suggestions */}
         {showDopamineWarning && (
           <motion.div 
@@ -280,7 +296,7 @@ export default function FocusMode() {
           {/* Animated Glow */}
           <div className={cn(
             "absolute inset-0 rounded-full blur-[100px] transition-all duration-1000 opacity-20",
-            isActive ? "bg-aura-primary" : "bg-zinc-700"
+            isActive ? (isLastMinute ? "bg-red-500" : "bg-aura-primary") : "bg-zinc-700"
           )} />
           
           <svg className="w-full h-full -rotate-90">
@@ -289,29 +305,88 @@ export default function FocusMode() {
               fill="transparent" 
               stroke="currentColor" 
               strokeWidth="4" 
-              className="text-aura-border"
+              className="text-aura-border/30"
+            />
+            {/* Background dashed ring */}
+            <circle 
+              cx="160" cy="160" r="130" 
+              fill="transparent" 
+              stroke="currentColor" 
+              strokeWidth="1" 
+              strokeDasharray="4 8"
+              className="text-aura-border/20"
             />
             <motion.circle 
               cx="160" cy="160" r="140" 
               fill="transparent" 
               stroke="currentColor" 
-              strokeWidth="4" 
+              strokeWidth="6" 
               strokeLinecap="round"
               strokeDasharray={2 * Math.PI * 140}
               initial={{ strokeDashoffset: 0 }}
-              animate={{ strokeDashoffset: 2 * Math.PI * 140 * (1 - progress / 100) }}
+              animate={{ 
+                strokeDashoffset: 2 * Math.PI * 140 * (1 - progress / 100),
+                stroke: isLastMinute ? "#ef4444" : "#C4A484"
+              }}
               transition={{ duration: 1, ease: 'linear' }}
-              className="text-aura-primary"
+              className="transition-colors duration-500"
             />
+            
+            {/* Pulse Ring when active */}
+            {isActive && (
+              <motion.circle
+                cx="160" cy="160" r="140" 
+                fill="transparent" 
+                stroke="currentColor" 
+                strokeWidth="12" 
+                strokeLinecap="round"
+                strokeDasharray={2 * Math.PI * 140}
+                animate={{ 
+                  strokeDashoffset: 2 * Math.PI * 140 * (1 - progress / 100),
+                  opacity: [0.1, 0, 0.1],
+                  scale: [1, 1.05, 1],
+                  stroke: isLastMinute ? "#ef4444" : "#C4A484"
+                }}
+                transition={{ 
+                  strokeDashoffset: { duration: 1, ease: 'linear' },
+                  opacity: { repeat: Infinity, duration: 2 },
+                  scale: { repeat: Infinity, duration: 2 }
+                }}
+                className="origin-center"
+              />
+            )}
           </svg>
 
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className="text-7xl font-serif font-bold tracking-tighter tabular-nums text-aura-primary">
+            <motion.span 
+              animate={isLastMinute && isActive ? { scale: [1, 1.05, 1] } : {}}
+              transition={{ repeat: Infinity, duration: 1 }}
+              className={cn(
+                "text-7xl font-serif font-bold tracking-tighter tabular-nums transition-colors duration-500",
+                isLastMinute && isActive ? "text-red-500" : "text-aura-primary"
+              )}
+            >
               {formatTime(timeLeft)}
+            </motion.span>
+            <span className={cn(
+              "text-[10px] mt-4 font-bold tracking-[0.3em] uppercase transition-colors",
+              isLastMinute && isActive ? "text-red-500 animate-pulse" : "text-aura-text-muted text-aura-text-muted"
+            )}>
+              {isActive ? (isLastMinute ? 'Final Stretch' : 'In Session') : 'Ready to Focus'}
             </span>
-            <span className="text-aura-text-muted text-[10px] mt-4 font-bold tracking-[0.3em] uppercase">
-              {isActive ? 'In Session' : 'Ready to Focus'}
-            </span>
+            
+            {/* Visual indicator for current work block */}
+            <div className="mt-6 flex gap-1.5">
+              {Array.from({ length: Math.ceil(requirements.sessionDuration / 15) }).map((_, i) => (
+                <div 
+                  key={i} 
+                  className={cn(
+                    "w-1 h-1 rounded-full",
+                    (timeLeft / 60) < (requirements.sessionDuration - (i * 15)) ? "bg-aura-primary" : "bg-aura-border"
+                  )} 
+                />
+              ))}
+            </div>
           </div>
         </div>
 
