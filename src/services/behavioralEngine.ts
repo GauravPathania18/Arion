@@ -155,21 +155,25 @@ export function updateDiscipline(current: DisciplineState, sessionSuccess: boole
     next.consecutiveSuccesses += 1;
     next.consecutiveBreaks = 0;
     next.isAutoTightened = false;
-    next.progressionPoints += 10;
+    next.progressionPoints += 25; // More points for success
   } else {
-    next.consecutiveSuccesses = 0;
+    next.consecutiveSuccesses = 0; // Break resets focus progress
     next.consecutiveBreaks += 1;
-    next.progressionPoints = Math.max(0, next.progressionPoints - 5);
+    next.progressionPoints = Math.max(0, next.progressionPoints - 15);
     
-    if (next.consecutiveBreaks >= 3) {
+    // Tighten protocol if user breaks repeatedly
+    if (next.consecutiveBreaks >= 2) {
       next.isAutoTightened = true;
     }
   }
 
-  // Level Up Logic
-  if (next.consecutiveSuccesses >= 10 && next.level === 'Gold') next.level = 'Iron';
-  else if (next.consecutiveSuccesses >= 5 && next.level === 'Silver') next.level = 'Gold';
-  else if (next.consecutiveSuccesses >= 3 && next.level === 'Bronze') next.level = 'Silver';
+  // Consistent Level Up Logic (5 wins to advance)
+  if (next.consecutiveSuccesses >= 5) {
+    if (next.level === 'Bronze') next.level = 'Silver';
+    else if (next.level === 'Silver') next.level = 'Gold';
+    else if (next.level === 'Gold') next.level = 'Iron';
+    next.consecutiveSuccesses = 0; // Reset streak after level up
+  }
 
   return next;
 }

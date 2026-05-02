@@ -81,11 +81,8 @@ export default function FocusMode() {
     setIsOverridePending(true);
     if (reason) setOverrideReason(reason);
     
-    setDiscipline(prev => ({ 
-      ...prev, 
-      consecutiveBreaks: prev.consecutiveBreaks + 1,
-      isAutoTightened: (prev.consecutiveBreaks + 1) >= 3
-    }));
+    // Use the central behavioral engine for state updates
+    setDiscipline(prev => updateDiscipline(prev, false));
   };
 
   // Simulation: Dopamine loop detection & Adaptive Suggestions
@@ -168,24 +165,44 @@ export default function FocusMode() {
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-4 mt-1">
+            <div className="flex flex-col gap-2 mt-2">
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <div className="flex gap-1">
+                    {[1, 2, 3, 4, 5].map((i) => (
+                      <div key={i} className={cn(
+                        "w-4 h-1.5 rounded-full transition-all duration-500",
+                        i <= discipline.consecutiveSuccesses 
+                          ? "bg-aura-primary shadow-[0_0_8px_rgba(196,164,132,0.6)]" 
+                          : "bg-aura-border"
+                      )} />
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-aura-text-muted uppercase font-bold tracking-widest min-w-[70px]">
+                    Focus Streak
+                  </p>
+                </div>
+                <div className="h-3 w-px bg-aura-border" />
+                <p className="text-[10px] text-aura-primary uppercase font-bold tracking-widest">
+                  {discipline.progressionPoints} Points
+                </p>
+              </div>
+
               <div className="flex items-center gap-2">
-                <div className="flex gap-0.5">
-                  {[1, 2, 3, 4, 5].map((i) => (
+                <div className="flex gap-1">
+                  {[1, 2, 3].map((i) => (
                     <div key={i} className={cn(
-                      "w-3 h-1 rounded-full",
-                      i <= discipline.consecutiveSuccesses ? "bg-aura-primary" : "bg-aura-border"
+                      "w-4 h-1.5 rounded-full transition-all duration-500",
+                      i <= discipline.consecutiveBreaks 
+                        ? "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.4)]" 
+                        : "bg-aura-border"
                     )} />
                   ))}
                 </div>
                 <p className="text-[10px] text-aura-text-muted uppercase font-bold tracking-widest">
-                  {discipline.consecutiveSuccesses}/5 Next Level
+                  Recent Breaks {discipline.consecutiveBreaks > 0 && `(${discipline.consecutiveBreaks}/3)`}
                 </p>
               </div>
-              <div className="h-3 w-px bg-aura-border" />
-              <p className="text-[10px] text-aura-primary uppercase font-bold tracking-widest">
-                {discipline.progressionPoints} Points
-              </p>
             </div>
           </div>
         </div>
