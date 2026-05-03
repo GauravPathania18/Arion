@@ -1,8 +1,33 @@
+# Dependencies
 node_modules/
-build/
 dist/
+dist-ssr/
+*.local
+
+# Firebase
+.firebase/
+firebase-applet-config.json
+firebase-debug.log*
+firestore-debug.log*
+ui-debug.log*
+
+# Environment Variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Build outputs
+build/
 coverage/
+
+# Misc
 .DS_Store
 *.log
-.env*
-!.env.example
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# TypeScript
+*.tsbuildinfo
