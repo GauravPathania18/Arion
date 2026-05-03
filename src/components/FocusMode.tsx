@@ -128,7 +128,7 @@ export default function FocusMode() {
 
           if (isProductive) {
             setSuggestion({ type: 'duration', value: '15' });
-          } else if (mostFrequent && !blockedSites.includes(mostFrequent)) {
+          } else if (mostFrequent && !settings.blockedSites.includes(mostFrequent)) {
             // Only suggest if it's not already blocked and not a productive domain
             setSuggestion({ type: 'site', value: mostFrequent });
           }
@@ -147,7 +147,7 @@ export default function FocusMode() {
     }
     
     return () => clearInterval(simulationInterval);
-  }, [isActive, engagements, isCooldown, recordEngagment]);
+  }, [isActive, engagements, isCooldown, recordEngagment, settings.blockedSites]);
 
   const resetFocus = () => {
     setShowDopamineWarning(false);
@@ -396,11 +396,36 @@ export default function FocusMode() {
       </AnimatePresence>
 
         <div className="relative w-80 h-80 flex items-center justify-center select-none">
-          {/* Ambient Background Glow */}
-          <div className={cn(
-            "absolute inset-0 rounded-full blur-[120px] transition-all duration-1000 opacity-20",
-            isActive ? (isLastMinute ? "bg-red-500" : "bg-arion-primary") : "bg-zinc-800"
-          )} />
+          {/* Ambient Background Aura - Reacts to Discipline Level */}
+          <motion.div 
+            animate={{ 
+              scale: isActive ? [1, 1.1, 1] : 1,
+              opacity: isActive ? [0.2, 0.3, 0.2] : 0.15
+            }}
+            transition={{ 
+              duration: requirements.sessionDuration === 60 ? 4 : 2.5, 
+              repeat: Infinity, 
+              ease: "easeInOut" 
+            }}
+            className={cn(
+              "absolute inset-0 rounded-full blur-[100px] transition-colors duration-1000",
+              !isActive ? "bg-zinc-800" :
+              isLastMinute ? "bg-red-500" :
+              discipline.level === 'Gold' ? "bg-amber-400" :
+              discipline.level === 'Silver' ? "bg-blue-400" : "bg-arion-primary"
+            )} 
+          />
+
+          {/* Kinetic Sector Grid */}
+          <div className="absolute inset-0 opacity-[0.05] pointer-events-none">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div 
+                key={i} 
+                className="absolute inset-0 border-r border-arion-primary/40" 
+                style={{ transform: `rotate(${i * 45}deg)` }} 
+              />
+            ))}
+          </div>
 
           {/* Rotating Scanner Beam */}
           {isActive && (
@@ -409,54 +434,58 @@ export default function FocusMode() {
               animate={{ rotate: 360 }}
               transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
               style={{
-                background: `conic-gradient(from 0deg at 50% 50%, transparent 0deg, transparent 350deg, var(--arion-primary) 360deg)`,
-                opacity: isLastMinute ? 0.4 : 0.2
+                background: `conic-gradient(from 0deg at 50% 50%, transparent 0deg, transparent 330deg, var(--arion-primary) 360deg)`,
+                opacity: isLastMinute ? 0.3 : 0.1
               }}
             />
           )}
-          
+
           <svg className="w-full h-full -rotate-90 relative z-20">
             {/* Main Outer Track */}
             <circle 
               cx="160" cy="160" r="140" 
               fill="transparent" 
               stroke="currentColor" 
-              strokeWidth="2" 
-              className="text-arion-border/20"
+              strokeWidth="1" 
+              className="text-arion-border/10"
             />
             
-            {/* Inner Ticks / Compass markings */}
-            {Array.from({ length: 60 }).map((_, i) => (
+            {/* Threshold Markers (25%, 50%, 75%) */}
+            {[90, 180, 270].map(deg => (
               <line
-                key={i}
-                x1="160" y1="20" x2="160" y2={i % 5 === 0 ? "32" : "26"}
+                key={deg}
+                x1="160" y1="18" x2="160" y2="34"
                 stroke="currentColor"
-                strokeWidth={i % 5 === 0 ? 1 : 0.5}
-                className={cn(
-                  "text-arion-border/40 origin-center",
-                  isActive && (360 - (i * 6)) < (progress * 3.6) ? "text-arion-primary/60" : ""
-                )}
-                transform={`rotate(${i * 6}, 160, 160)`}
+                strokeWidth="1"
+                className="text-arion-primary/40"
+                style={{ transformOrigin: '160px 160px', transform: `rotate(${deg}deg)` }}
               />
             ))}
 
-            {/* Background dashed ring */}
-            <circle 
-              cx="160" cy="160" r="120" 
-              fill="transparent" 
-              stroke="currentColor" 
-              strokeWidth="1" 
-              strokeDasharray="2 12"
-              className="text-arion-border/10"
-            />
+            {/* Inner Ticks / Biometric Markings */}
+            {Array.from({ length: 120 }).map((_, i) => (
+              <line
+                key={i}
+                x1="160" y1="20" x2="160" y2={i % 10 === 0 ? "35" : "26"}
+                stroke="currentColor"
+                strokeWidth={i % 10 === 0 ? 1 : 0.5}
+                className={cn(
+                  "transition-colors duration-300",
+                  isActive && (progress >= (i / 1.2)) 
+                    ? (isLastMinute ? "text-red-500/60" : "text-arion-primary/60") 
+                    : "text-arion-border/20"
+                )}
+                style={{ transformOrigin: '160px 160px', transform: `rotate(${i * 3}deg)` }}
+              />
+            ))}
 
-            {/* Active Progress Ring */}
+            {/* Active Progress Ring (Base) */}
             <motion.circle 
               cx="160" cy="160" r="140" 
               fill="transparent" 
               stroke="currentColor" 
-              strokeWidth="4" 
-              strokeLinecap="square"
+              strokeWidth="2" 
+              strokeLinecap="butt"
               strokeDasharray={2 * Math.PI * 140}
               initial={{ strokeDashoffset: 2 * Math.PI * 140 }}
               animate={{ 
@@ -464,83 +493,78 @@ export default function FocusMode() {
                 stroke: isLastMinute ? "#ef4444" : "#C4A484"
               }}
               transition={{ duration: 1, ease: 'linear' }}
-              className="transition-colors duration-500 drop-shadow-[0_0_8px_rgba(196,164,132,0.3)]"
+              className="transition-colors duration-500 shadow-[0_0_15px_rgba(196,164,132,0.2)]"
             />
             
-            {/* Trailing Glow Ring when active */}
+            {/* Trailing Light Effect */}
             {isActive && (
               <motion.circle
                 cx="160" cy="160" r="140" 
                 fill="transparent" 
                 stroke="currentColor" 
-                strokeWidth="10" 
+                strokeWidth="8" 
                 strokeLinecap="round"
-                strokeDasharray={2 * Math.PI * 140}
+                strokeDasharray="2 200"
                 animate={{ 
-                  strokeDashoffset: 2 * Math.PI * 140 * (1 - progress / 100),
-                  opacity: [0.15, 0.05, 0.15],
-                  scale: [1, 1.02, 1],
+                  rotate: 360,
                   stroke: isLastMinute ? "#ef4444" : "#C4A484"
                 }}
                 transition={{ 
-                  strokeDashoffset: { duration: 1, ease: 'linear' },
-                  opacity: { repeat: Infinity, duration: 3, ease: "easeInOut" },
-                  scale: { repeat: Infinity, duration: 3, ease: "easeInOut" }
+                  rotate: { repeat: Infinity, duration: 2, ease: "linear" },
+                  stroke: { duration: 0.5 }
                 }}
-                className="origin-center pointer-events-none"
+                className="origin-center opacity-30 shadow-[0_0_20px_rgba(196,164,132,0.4)]"
               />
             )}
           </svg>
 
           <div className="absolute inset-0 flex flex-col items-center justify-center z-30">
             <div className="flex flex-col items-center">
-              <motion.span 
-                key={timeLeft}
-                initial={{ opacity: 0.8, scale: 0.98 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className={cn(
+              <div className="flex items-baseline">
+                <span className={cn(
                   "text-7xl font-serif font-bold tracking-tighter tabular-nums transition-colors duration-500",
                   isLastMinute && isActive ? "text-red-500" : "text-arion-primary"
-                )}
-              >
-                {formatTime(timeLeft)}
-              </motion.span>
+                )}>
+                  {formatTime(timeLeft)}
+                </span>
+              </div>
               
-              <div className="flex items-center gap-3 mt-4 h-4">
+              <div className="flex flex-col items-center gap-1 mt-4">
                 <span className={cn(
-                  "text-[9px] font-black tracking-[0.4em] uppercase transition-colors",
+                  "text-[9px] font-black tracking-[0.4em] uppercase transition-colors duration-500",
                   isLastMinute && isActive ? "text-red-500" : "text-arion-text-muted"
                 )}>
-                  {isActive ? (isLastMinute ? 'Final Threshold' : 'Deep Focus') : 'Ready to Focus'}
+                  {isActive ? (isLastMinute ? 'Final Threshold' : `${discipline.level} Intensity`) : 'Perimeter Ready'}
                 </span>
                 
-                {/* Millisecond-like simulated sub-tick */}
+                {/* Visual Depth Indicator */}
                 {isActive && (
-                  <div className="w-10 h-3 bg-arion-bg border border-arion-border flex items-center justify-center overflow-hidden">
-                    <motion.div
-                      animate={{ y: [0, -40] }}
-                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                      className="text-[8px] font-mono text-arion-primary/40 flex flex-col gap-1"
-                    >
-                      {[10, 20, 30, 40, 50, 60, 70, 80, 90, 0].map(n => <span key={n}>{n}</span>)}
-                    </motion.div>
+                  <div className="flex gap-0.5 mt-1">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <motion.div 
+                        key={i}
+                        animate={{ height: isActive ? [4, 8, 4] : 4 }}
+                        transition={{ duration: 1.5, repeat: Infinity, delay: i * 0.1 }}
+                        className="w-0.5 bg-arion-primary/40 rounded-full"
+                      />
+                    ))}
                   </div>
                 )}
               </div>
             </div>
             
             {/* Visual indicator for current work block */}
-            <div className="mt-8 flex gap-2">
+            <div className="mt-10 flex gap-2.5">
               {Array.from({ length: Math.ceil(requirements.sessionDuration / 15) }).map((_, i) => (
                 <div key={i} className="relative">
                   <div className={cn(
                     "w-1.5 h-1.5 rounded-full transition-all duration-1000",
-                    (timeLeft / 60) < (requirements.sessionDuration - (i * 15)) ? "bg-arion-primary shadow-[0_0_8px_rgba(196,164,132,0.6)]" : "bg-arion-border"
+                    (timeLeft / 60) < (requirements.sessionDuration - (i * 15)) ? "bg-arion-primary shadow-[0_0_10px_rgba(196,164,132,0.6)]" : "bg-arion-border/30"
                   )} />
                   {(timeLeft / 60) >= (requirements.sessionDuration - (i * 15)) && (timeLeft / 60) < (requirements.sessionDuration - (i * 15) + 15) && isActive && (
                     <motion.div 
                       layoutId="activeBlock"
-                      className="absolute inset-0 rounded-full bg-arion-primary/40 animate-ping"
+                      className="absolute -inset-1 rounded-full border border-arion-primary/30 animate-ping"
                     />
                   )}
                 </div>

@@ -16,7 +16,8 @@ service cloud.firestore {
     }
 
     function isValidId(id) {
-      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+      // Simplified ID validation: standard alphanumeric, underscore, or hyphen
+      return id is string && id.size() > 0 && id.size() <= 128;
     }
 
     function incoming() {
@@ -58,34 +59,48 @@ service cloud.firestore {
         && (data.distractionsBlocked == null || data.distractionsBlocked is number);
     }
 
+    function isValidUserSettings(data) {
+      return (data.defaultSessionDuration == null || (data.defaultSessionDuration is number && data.defaultSessionDuration >= 5 && data.defaultSessionDuration <= 120))
+        && (data.blockedSites == null || (data.blockedSites is list && data.blockedSites.size() <= 100))
+        && (data.incognitoBlocker == null || data.incognitoBlocker is bool)
+        && (data.notionToken == null || (data.notionToken is string && data.notionToken.size() <= 256))
+        && (data.notionDatabaseId == null || (data.notionDatabaseId is string && data.notionDatabaseId.size() <= 128));
+    }
+
     // --- Rules ---
 
     match /users/{userId} {
-      allow get: if isOwner(userId) && isValidId(userId);
-      allow create: if isOwner(userId) && isValidId(userId) && isValidUserProfile(incoming());
-      allow update: if isOwner(userId) && isValidId(userId) && isValidUserProfile(incoming())
+      allow get: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUserProfile(incoming());
+      allow update: if isOwner(userId) && isValidUserProfile(incoming())
         && incoming().createdAt == existing().createdAt; // Immutable field
 
       match /history/{dayId} {
-        allow list: if isOwner(userId) && isValidId(userId);
-        allow get: if isOwner(userId) && isValidId(userId) && isValidId(dayId);
-        allow create: if isOwner(userId) && isValidId(userId) && isValidId(dayId) && isValidDayData(incoming());
-        allow update: if isOwner(userId) && isValidId(userId) && isValidId(dayId) && isValidDayData(incoming());
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidDayData(incoming());
+        allow update: if isOwner(userId) && isValidDayData(incoming());
 
         match /sites/{siteId} {
-          allow list: if isOwner(userId) && isValidId(userId);
-          allow get: if isOwner(userId) && isValidId(userId) && isValidId(dayId) && isValidId(siteId);
-          allow create: if isOwner(userId) && isValidId(userId) && isValidId(dayId) && isValidId(siteId) && isValidSiteUsage(incoming());
-          allow update: if isOwner(userId) && isValidId(userId) && isValidId(dayId) && isValidId(siteId) && isValidSiteUsage(incoming());
+          allow list: if isOwner(userId);
+          allow get: if isOwner(userId);
+          allow create: if isOwner(userId) && isValidSiteUsage(incoming());
+          allow update: if isOwner(userId) && isValidSiteUsage(incoming());
         }
       }
 
       match /sessions/{sessionId} {
-        allow list: if isOwner(userId) && isValidId(userId);
-        allow get: if isOwner(userId) && isValidId(userId) && isValidId(sessionId);
-        allow create: if isOwner(userId) && isValidId(userId) && isValidId(sessionId) && isValidFocusSession(incoming());
-        allow update: if isOwner(userId) && isValidId(userId) && isValidId(sessionId) && isValidFocusSession(incoming())
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidFocusSession(incoming());
+        allow update: if isOwner(userId) && isValidFocusSession(incoming())
           && incoming().startTime == existing().startTime; // Immutable field
+      }
+
+      match /settings/{settingId} {
+        allow get, list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidUserSettings(incoming());
+        allow update: if isOwner(userId) && isValidUserSettings(incoming());
       }
     }
   }

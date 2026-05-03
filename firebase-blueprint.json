@@ -48,6 +48,18 @@
         "distractionsBlocked": { "type": "number" }
       },
       "required": ["startTime", "duration", "completed"]
+    },
+    "UserSettings": {
+      "title": "User Settings",
+      "description": "Customizable app settings for the user",
+      "type": "object",
+      "properties": {
+        "defaultSessionDuration": { "type": "number" },
+        "blockedSites": { "type": "array", "items": { "type": "string" } },
+        "incognitoBlocker": { "type": "boolean" },
+        "notionToken": { "type": "string" },
+        "notionDatabaseId": { "type": "string" }
+      }
     }
   },
   "firestore": {
@@ -66,6 +78,10 @@
     "/users/{userId}/sessions/{sessionId}": {
       "schema": "FocusSession",
       "description": "Recorded focus sessions"
+    },
+    "/users/{userId}/settings/{settingId}": {
+      "schema": "UserSettings",
+      "description": "User configuration settings"
     }
   }
 }
