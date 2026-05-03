@@ -84,8 +84,14 @@ export default function Dashboard() {
   const chartData = useMemo(() => {
     // If we have recent engagements, we can show a more granular "Intensity" chart for today
     if (engagements.length > 0) {
-      const now = Date.now();
-      const last6Hours = now - (6 * 60 * 60 * 1000);
+      const now = new Date();
+      // Round to nearest 10m to align segments
+      const roundedNow = new Date(now);
+      roundedNow.setMinutes(Math.floor(roundedNow.getMinutes() / 10) * 10);
+      roundedNow.setSeconds(0);
+      roundedNow.setMilliseconds(0);
+
+      const last6Hours = now.getTime() - (6 * 60 * 60 * 1000);
       const recentEngagements = engagements.filter(e => e.timestamp > last6Hours);
       
       if (recentEngagements.length > 3) {
@@ -94,7 +100,7 @@ export default function Dashboard() {
         
         // Initialize segments to ensure continuity
         for (let i = 0; i < 36; i++) {
-          const time = new Date(now - (i * 10 * 60 * 1000));
+          const time = new Date(roundedNow.getTime() - (i * 10 * 60 * 1000));
           const key = time.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
           segments[key] = { focus: 0, distractions: 0, count: 0 };
         }
@@ -117,11 +123,17 @@ export default function Dashboard() {
         return Object.entries(segments)
           .reverse()
           .map(([time, data]) => {
+            const hasData = data.count > 0;
             const total = (data.focus + data.distractions) || 1;
+            const focusScore = hasData 
+              ? Math.max(30, Math.round((data.focus / total) * 100)) 
+              : 20; // Lower baseline for inactivity
+              
             return {
               time,
-              focus: Math.max(20, Math.round((data.focus / total) * 100)) || 50,
-              distractions: Math.round((data.distractions / total) * 100) || 0
+              focus: focusScore,
+              distractions: hasData ? Math.round((data.distractions / total) * 100) : 0,
+              hasData
             };
           });
       }
@@ -137,10 +149,16 @@ export default function Dashboard() {
       return {
         time: formattedDate,
         focus: day.focusScore,
-        distractions: Math.max(0, 100 - day.focusScore)
+        distractions: Math.max(0, 100 - day.focusScore),
+        hasData: true
       };
     });
   }, [history, engagements]);
+
+  const peakIntensity = useMemo(() => {
+    if (chartData.length === 0) return 0;
+    return Math.max(...chartData.map(d => d.focus));
+  }, [chartData]);
 
   const CustomChartTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -211,7 +229,7 @@ export default function Dashboard() {
         {/* Main Chart */}
         <div className="lg:col-span-2 bg-arion-card border border-arion-border p-6 rounded-sm h-[420px] relative overflow-hidden">
           {/* Subtle grid background for the card itself */}
-          <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'radial-gradient(#C4A484 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
+          <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'radial-gradient(var(--arion-primary) 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
           
           <div className="flex items-center justify-between mb-6 relative z-10">
             <div>
@@ -295,7 +313,7 @@ export default function Dashboard() {
               </div>
               <div className="space-y-1 border-l border-arion-border/50 pl-4">
                 <p className="text-[8px] text-arion-text-muted uppercase font-black tracking-widest">Peak Intensity</p>
-                <p className="text-xs font-serif italic text-arion-primary">94%</p>
+                <p className="text-xs font-serif italic text-arion-primary">{peakIntensity}%</p>
               </div>
             </div>
             <button className="text-[9px] text-arion-primary uppercase font-bold tracking-[0.2em] hover:opacity-80 transition-opacity">

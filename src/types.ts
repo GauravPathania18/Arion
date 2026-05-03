@@ -25,3 +25,11 @@ export interface FocusSession {
   completed: boolean;
   distractionsBlocked: number;
 }
+
+export interface UserSettings {
+  defaultSessionDuration: number;
+  blockedSites: string[];
+  incognitoBlocker: boolean;
+  notionToken?: string;
+  notionDatabaseId?: string;
+}

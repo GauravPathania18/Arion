@@ -16,7 +16,7 @@ import { PRODUCTIVE_SITES, DISTRACTING_SITES } from '../constants';
 import { useProductivity } from '../ProductivityContext';
 
 export default function FocusMode() {
-  const { startSession, endSession, activeSession, engagements, recordEngagment } = useProductivity();
+  const { startSession, endSession, activeSession, engagements, recordEngagment, settings, updateSettings } = useProductivity();
   const [discipline, setDiscipline] = useState<DisciplineState>({
     level: 'Bronze',
     progressionPoints: 240,
@@ -28,9 +28,8 @@ export default function FocusMode() {
   
   const requirements = getDisciplineRequirements(discipline);
   const [isActive, setIsActive] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(requirements.sessionDuration * 60);
+  const [timeLeft, setTimeLeft] = useState(settings.defaultSessionDuration * 60);
   const [isBlocking, setIsBlocking] = useState(true);
-  const [blockedSites, setBlockedSites] = useState(['twitter.com', 'facebook.com', 'reddit.com', 'youtube.com']);
   const [newSite, setNewSite] = useState('');
   const [showDopamineWarning, setShowDopamineWarning] = useState(false);
   const [dopamineReason, setDopamineReason] = useState('');
@@ -169,19 +168,21 @@ export default function FocusMode() {
 
   const addSite = (e: React.FormEvent) => {
     e.preventDefault();
-    if (newSite && !blockedSites.includes(newSite.toLowerCase())) {
-      setBlockedSites([...blockedSites, newSite.toLowerCase()]);
+    if (newSite && !settings.blockedSites.includes(newSite.toLowerCase())) {
+      updateSettings({ blockedSites: [...settings.blockedSites, newSite.toLowerCase()] });
       setNewSite('');
     }
   };
 
   const removeSite = (siteToRemove: string) => {
-    setBlockedSites(blockedSites.filter(site => site !== siteToRemove));
+    updateSettings({ blockedSites: settings.blockedSites.filter(site => site !== siteToRemove) });
   };
 
   useEffect(() => {
-    setTimeLeft(requirements.sessionDuration * 60);
-  }, [discipline.level]);
+    if (!isActive) {
+      setTimeLeft(settings.defaultSessionDuration * 60);
+    }
+  }, [settings.defaultSessionDuration, isActive]);
 
   useEffect(() => {
     let interval: any;
@@ -203,7 +204,7 @@ export default function FocusMode() {
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
-  const progress = (timeLeft / (requirements.sessionDuration * 60)) * 100;
+  const progress = (timeLeft / (isActive ? (activeSession?.duration ? activeSession.duration * 60 : settings.defaultSessionDuration * 60) : settings.defaultSessionDuration * 60)) * 100;
   const isLastMinute = timeLeft <= 60 && timeLeft > 0;
 
   return (
@@ -373,7 +374,7 @@ export default function FocusMode() {
                 <div className="flex gap-2 w-full">
                   <button 
                     onClick={() => {
-                      if (suggestion.type === 'site') setBlockedSites([...blockedSites, suggestion.value]);
+                      if (suggestion.type === 'site') updateSettings({ blockedSites: [...settings.blockedSites, suggestion.value] });
                       else setTimeLeft(prev => prev + (parseInt(suggestion.value) * 60));
                       setSuggestion(null);
                     }}
@@ -394,99 +395,155 @@ export default function FocusMode() {
         )}
       </AnimatePresence>
 
-        <div className="relative w-80 h-80 flex items-center justify-center">
-          {/* Animated Glow */}
+        <div className="relative w-80 h-80 flex items-center justify-center select-none">
+          {/* Ambient Background Glow */}
           <div className={cn(
-            "absolute inset-0 rounded-full blur-[100px] transition-all duration-1000 opacity-20",
-            isActive ? (isLastMinute ? "bg-red-500" : "bg-arion-primary") : "bg-zinc-700"
+            "absolute inset-0 rounded-full blur-[120px] transition-all duration-1000 opacity-20",
+            isActive ? (isLastMinute ? "bg-red-500" : "bg-arion-primary") : "bg-zinc-800"
           )} />
+
+          {/* Rotating Scanner Beam */}
+          {isActive && (
+            <motion.div
+              className="absolute inset-0 z-10 pointer-events-none rounded-full"
+              animate={{ rotate: 360 }}
+              transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+              style={{
+                background: `conic-gradient(from 0deg at 50% 50%, transparent 0deg, transparent 350deg, var(--arion-primary) 360deg)`,
+                opacity: isLastMinute ? 0.4 : 0.2
+              }}
+            />
+          )}
           
-          <svg className="w-full h-full -rotate-90">
+          <svg className="w-full h-full -rotate-90 relative z-20">
+            {/* Main Outer Track */}
             <circle 
               cx="160" cy="160" r="140" 
               fill="transparent" 
               stroke="currentColor" 
-              strokeWidth="4" 
-              className="text-arion-border/30"
+              strokeWidth="2" 
+              className="text-arion-border/20"
             />
+            
+            {/* Inner Ticks / Compass markings */}
+            {Array.from({ length: 60 }).map((_, i) => (
+              <line
+                key={i}
+                x1="160" y1="20" x2="160" y2={i % 5 === 0 ? "32" : "26"}
+                stroke="currentColor"
+                strokeWidth={i % 5 === 0 ? 1 : 0.5}
+                className={cn(
+                  "text-arion-border/40 origin-center",
+                  isActive && (360 - (i * 6)) < (progress * 3.6) ? "text-arion-primary/60" : ""
+                )}
+                transform={`rotate(${i * 6}, 160, 160)`}
+              />
+            ))}
+
             {/* Background dashed ring */}
             <circle 
-              cx="160" cy="160" r="130" 
+              cx="160" cy="160" r="120" 
               fill="transparent" 
               stroke="currentColor" 
               strokeWidth="1" 
-              strokeDasharray="4 8"
-              className="text-arion-border/20"
+              strokeDasharray="2 12"
+              className="text-arion-border/10"
             />
+
+            {/* Active Progress Ring */}
             <motion.circle 
               cx="160" cy="160" r="140" 
               fill="transparent" 
               stroke="currentColor" 
-              strokeWidth="6" 
-              strokeLinecap="round"
+              strokeWidth="4" 
+              strokeLinecap="square"
               strokeDasharray={2 * Math.PI * 140}
-              initial={{ strokeDashoffset: 0 }}
+              initial={{ strokeDashoffset: 2 * Math.PI * 140 }}
               animate={{ 
                 strokeDashoffset: 2 * Math.PI * 140 * (1 - progress / 100),
                 stroke: isLastMinute ? "#ef4444" : "#C4A484"
               }}
               transition={{ duration: 1, ease: 'linear' }}
-              className="transition-colors duration-500"
+              className="transition-colors duration-500 drop-shadow-[0_0_8px_rgba(196,164,132,0.3)]"
             />
             
-            {/* Pulse Ring when active */}
+            {/* Trailing Glow Ring when active */}
             {isActive && (
               <motion.circle
                 cx="160" cy="160" r="140" 
                 fill="transparent" 
                 stroke="currentColor" 
-                strokeWidth="12" 
+                strokeWidth="10" 
                 strokeLinecap="round"
                 strokeDasharray={2 * Math.PI * 140}
                 animate={{ 
                   strokeDashoffset: 2 * Math.PI * 140 * (1 - progress / 100),
-                  opacity: [0.1, 0, 0.1],
-                  scale: [1, 1.05, 1],
+                  opacity: [0.15, 0.05, 0.15],
+                  scale: [1, 1.02, 1],
                   stroke: isLastMinute ? "#ef4444" : "#C4A484"
                 }}
                 transition={{ 
                   strokeDashoffset: { duration: 1, ease: 'linear' },
-                  opacity: { repeat: Infinity, duration: 2 },
-                  scale: { repeat: Infinity, duration: 2 }
+                  opacity: { repeat: Infinity, duration: 3, ease: "easeInOut" },
+                  scale: { repeat: Infinity, duration: 3, ease: "easeInOut" }
                 }}
-                className="origin-center"
+                className="origin-center pointer-events-none"
               />
             )}
           </svg>
 
-          <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <motion.span 
-              animate={isLastMinute && isActive ? { scale: [1, 1.05, 1] } : {}}
-              transition={{ repeat: Infinity, duration: 1 }}
-              className={cn(
-                "text-7xl font-serif font-bold tracking-tighter tabular-nums transition-colors duration-500",
-                isLastMinute && isActive ? "text-red-500" : "text-arion-primary"
-              )}
-            >
-              {formatTime(timeLeft)}
-            </motion.span>
-            <span className={cn(
-              "text-[10px] mt-4 font-bold tracking-[0.3em] uppercase transition-colors",
-              isLastMinute && isActive ? "text-red-500 animate-pulse" : "text-arion-text-muted"
-            )}>
-              {isActive ? (isLastMinute ? 'Final Stretch' : 'In Session') : 'Ready to Focus'}
-            </span>
+          <div className="absolute inset-0 flex flex-col items-center justify-center z-30">
+            <div className="flex flex-col items-center">
+              <motion.span 
+                key={timeLeft}
+                initial={{ opacity: 0.8, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className={cn(
+                  "text-7xl font-serif font-bold tracking-tighter tabular-nums transition-colors duration-500",
+                  isLastMinute && isActive ? "text-red-500" : "text-arion-primary"
+                )}
+              >
+                {formatTime(timeLeft)}
+              </motion.span>
+              
+              <div className="flex items-center gap-3 mt-4 h-4">
+                <span className={cn(
+                  "text-[9px] font-black tracking-[0.4em] uppercase transition-colors",
+                  isLastMinute && isActive ? "text-red-500" : "text-arion-text-muted"
+                )}>
+                  {isActive ? (isLastMinute ? 'Final Threshold' : 'Deep Focus') : 'Ready to Focus'}
+                </span>
+                
+                {/* Millisecond-like simulated sub-tick */}
+                {isActive && (
+                  <div className="w-10 h-3 bg-arion-bg border border-arion-border flex items-center justify-center overflow-hidden">
+                    <motion.div
+                      animate={{ y: [0, -40] }}
+                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                      className="text-[8px] font-mono text-arion-primary/40 flex flex-col gap-1"
+                    >
+                      {[10, 20, 30, 40, 50, 60, 70, 80, 90, 0].map(n => <span key={n}>{n}</span>)}
+                    </motion.div>
+                  </div>
+                )}
+              </div>
+            </div>
             
             {/* Visual indicator for current work block */}
-            <div className="mt-6 flex gap-1.5">
+            <div className="mt-8 flex gap-2">
               {Array.from({ length: Math.ceil(requirements.sessionDuration / 15) }).map((_, i) => (
-                <div 
-                  key={i} 
-                  className={cn(
-                    "w-1 h-1 rounded-full",
-                    (timeLeft / 60) < (requirements.sessionDuration - (i * 15)) ? "bg-arion-primary" : "bg-arion-border"
-                  )} 
-                />
+                <div key={i} className="relative">
+                  <div className={cn(
+                    "w-1.5 h-1.5 rounded-full transition-all duration-1000",
+                    (timeLeft / 60) < (requirements.sessionDuration - (i * 15)) ? "bg-arion-primary shadow-[0_0_8px_rgba(196,164,132,0.6)]" : "bg-arion-border"
+                  )} />
+                  {(timeLeft / 60) >= (requirements.sessionDuration - (i * 15)) && (timeLeft / 60) < (requirements.sessionDuration - (i * 15) + 15) && isActive && (
+                    <motion.div 
+                      layoutId="activeBlock"
+                      className="absolute inset-0 rounded-full bg-arion-primary/40 animate-ping"
+                    />
+                  )}
+                </div>
               ))}
             </div>
           </div>
@@ -499,7 +556,7 @@ export default function FocusMode() {
                 setDiscipline(prev => updateDiscipline(prev, false));
                 endSession(false);
               } else {
-                startSession(requirements.sessionDuration);
+                startSession(settings.defaultSessionDuration || requirements.sessionDuration);
               }
             }}
             className="w-16 h-16 rounded-sm bg-arion-primary text-arion-bg flex items-center justify-center hover:scale-105 transition-transform active:scale-95 shadow-2xl shadow-arion-primary/20"
@@ -676,7 +733,7 @@ export default function FocusMode() {
         </form>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {blockedSites.map((site) => (
+          {settings.blockedSites.map((site) => (
             <div 
               key={site} 
               className="flex items-center justify-between p-3 bg-arion-bg border border-arion-border rounded-sm group hover:border-arion-primary/30 transition-all"
@@ -692,7 +749,7 @@ export default function FocusMode() {
           ))}
         </div>
         
-        {blockedSites.length === 0 && (
+        {settings.blockedSites.length === 0 && (
           <div className="text-center py-8 border border-dashed border-arion-border rounded-sm">
             <p className="text-[10px] text-arion-text-muted uppercase tracking-widest italic">No restrictions active. Your perimeter is open.</p>
           </div>

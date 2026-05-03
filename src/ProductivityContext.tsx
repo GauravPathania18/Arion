@@ -1,8 +1,9 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { BehavioralMetrics, FocusSession, SiteUsage, DayData } from './types';
+import { BehavioralMetrics, FocusSession, SiteUsage, DayData, UserSettings } from './types';
 import { TabEngagement, getSiteCategory } from './services/behavioralEngine';
 import { auth, db, handleFirestoreError, OperationType } from './lib/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
+import { PRODUCTIVE_SITES, DISTRACTING_SITES } from './constants';
 import { 
   collection, 
   doc, 
@@ -26,6 +27,7 @@ interface ProductivityContextType {
   currentMetrics: BehavioralMetrics;
   siteUsage: SiteUsage[];
   engagements: TabEngagement[];
+  settings: UserSettings;
   
   // Historical Data
   history: DayData[];
@@ -39,6 +41,7 @@ interface ProductivityContextType {
   recordEngagment: (engagement: TabEngagement) => void;
   recordSiteUsage: (site: string, duration: number) => void;
   updateMetrics: (updates: Partial<BehavioralMetrics>) => void;
+  updateSettings: (updates: Partial<UserSettings>) => Promise<void>;
 }
 
 const ProductivityContext = createContext<ProductivityContextType | undefined>(undefined);
@@ -57,6 +60,11 @@ export function ProductivityProvider({ children }: { children: React.ReactNode }
   const [siteUsage, setSiteUsage] = useState<SiteUsage[]>([]);
   const [engagements, setEngagements] = useState<TabEngagement[]>([]);
   const [history, setHistory] = useState<DayData[]>([]);
+  const [settings, setSettings] = useState<UserSettings>({
+    defaultSessionDuration: 25,
+    blockedSites: [...DISTRACTING_SITES],
+    incognitoBlocker: true
+  });
 
   // Auth Listener
   useEffect(() => {
@@ -92,9 +100,18 @@ export function ProductivityProvider({ children }: { children: React.ReactNode }
       setSiteUsage(data);
     }, (err) => handleFirestoreError(err, OperationType.LIST, `users/${user.uid}/history/${todayId}/sites`));
 
+    // Sync Settings
+    const settingsRef = doc(db, 'users', user.uid, 'settings', 'config');
+    const unsubSettings = onSnapshot(settingsRef, (docSnap) => {
+      if (docSnap.exists()) {
+        setSettings(prev => ({ ...prev, ...docSnap.data() }));
+      }
+    }, (err) => handleFirestoreError(err, OperationType.GET, `users/${user.uid}/settings/config`));
+
     return () => {
       unsubHistory();
       unsubSites();
+      unsubSettings();
     };
   }, [user]);
 
@@ -197,6 +214,17 @@ export function ProductivityProvider({ children }: { children: React.ReactNode }
     setCurrentMetrics(prev => ({ ...prev, ...updates }));
   }, []);
 
+  const updateSettings = useCallback(async (updates: Partial<UserSettings>) => {
+    if (!user) return;
+    const settingsRef = doc(db, 'users', user.uid, 'settings', 'config');
+    try {
+      await setDoc(settingsRef, updates, { merge: true });
+      setSettings(prev => ({ ...prev, ...updates }));
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, `users/${user.uid}/settings/config`);
+    }
+  }, [user]);
+
   return (
     <ProductivityContext.Provider value={{
       user,
@@ -208,6 +236,7 @@ export function ProductivityProvider({ children }: { children: React.ReactNode }
       siteUsage,
       engagements,
       history,
+      settings,
       startTracking,
       stopTracking,
       startSession,
@@ -215,7 +244,8 @@ export function ProductivityProvider({ children }: { children: React.ReactNode }
       clearFinishedSession,
       recordEngagment,
       recordSiteUsage,
-      updateMetrics
+      updateMetrics,
+      updateSettings
     }}>
       {children}
     </ProductivityContext.Provider>

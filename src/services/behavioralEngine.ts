@@ -1,4 +1,4 @@
-import { SiteUsage, FocusSession, BehavioralMetrics } from '../types';
+import { FocusSession, BehavioralMetrics } from '../types';
 import { PRODUCTIVE_SITES, DISTRACTING_SITES } from '../constants';
 
 export interface TabEngagement {

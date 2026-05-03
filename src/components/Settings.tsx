@@ -9,19 +9,36 @@ import {
   Moon,
   Sun,
   ShieldCheck,
-  HelpCircle
+  HelpCircle,
+  Timer
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useTheme } from '../ThemeContext';
 import Tooltip from './Tooltip';
+import { useProductivity } from '../ProductivityContext';
 
 export default function Settings() {
-  const { theme, toggleTheme, setTheme } = useTheme();
-  const [incognitoEnabled, setIncognitoEnabled] = useState(true);
-  const [schedules, setSchedules] = useState([
+  const { theme, setTheme } = useTheme();
+  const { settings, updateSettings } = useProductivity();
+  const [newSite, setNewSite] = useState('');
+
+  const [schedules] = useState([
     { id: 1, start: '23:00', end: '09:00', name: 'Sleep Cycle' },
     { id: 2, start: '13:00', end: '15:00', name: 'Deep Work' },
   ]);
+
+  const handleAddSite = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newSite) return;
+    const cleanSite = newSite.trim().toLowerCase();
+    if (settings.blockedSites.includes(cleanSite)) return;
+    updateSettings({ blockedSites: [...settings.blockedSites, cleanSite] });
+    setNewSite('');
+  };
+
+  const handleRemoveSite = (site: string) => {
+    updateSettings({ blockedSites: settings.blockedSites.filter(s => s !== site) });
+  };
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
@@ -29,6 +46,82 @@ export default function Settings() {
         <h2 className="text-2xl font-serif italic tracking-tighter mb-2 text-arion-primary">App Settings</h2>
         <p className="text-arion-text-muted text-sm uppercase tracking-widest font-bold">Manage your focus and privacy.</p>
       </div>
+
+      {/* Focus Mode Configuration */}
+      <section className="bg-arion-card border border-arion-border rounded-sm overflow-hidden shadow-2xl">
+        <div className="p-6 border-b border-arion-border bg-arion-bg flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 border border-arion-primary/20 bg-arion-primary/5 rounded-sm">
+              <Timer className="w-5 h-5 text-arion-primary" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-serif italic tracking-wide">Focus Mode Configuration</h3>
+                <Tooltip content="Fine-tune your deep work sessions and site restrictions." />
+              </div>
+              <p className="text-[10px] text-arion-text-muted uppercase tracking-tight">Session parameters & guardrails</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-6 space-y-8">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <label className="text-xs font-bold uppercase tracking-widest text-arion-text-bright">Default Session Duration</label>
+                <p className="text-[10px] text-arion-text-muted italic">Recommended: 25-45 minutes for peak neuroplasticity.</p>
+              </div>
+              <span className="text-xl font-serif italic text-arion-primary">{settings.defaultSessionDuration}m</span>
+            </div>
+            <input 
+              type="range" 
+              min="5" 
+              max="120" 
+              step="5"
+              value={settings.defaultSessionDuration}
+              onChange={(e) => updateSettings({ defaultSessionDuration: parseInt(e.target.value) })}
+              className="w-full accent-arion-primary cursor-pointer"
+            />
+          </div>
+
+          <div className="pt-4 border-t border-arion-border">
+            <div className="flex items-center gap-2 mb-4">
+              <h4 className="text-[10px] uppercase font-bold tracking-widest text-arion-text-muted">Restricted Domains</h4>
+              <Tooltip content="Sites added here will trigger block screens during active sessions." />
+            </div>
+            
+            <form onSubmit={handleAddSite} className="flex gap-2 mb-4">
+              <input 
+                type="text" 
+                value={newSite}
+                onChange={(e) => setNewSite(e.target.value)}
+                placeholder="e.g. twitter.com" 
+                className="flex-1 bg-arion-bg border border-arion-border rounded-sm px-4 py-3 text-xs placeholder:italic focus:outline-none focus:border-arion-primary transition-colors text-arion-text-bright"
+              />
+              <button 
+                type="submit"
+                className="px-6 bg-arion-primary text-arion-bg font-bold uppercase tracking-widest text-[9px] rounded-sm hover:opacity-90 transition-opacity"
+              >
+                Add Site
+              </button>
+            </form>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {settings.blockedSites.map(site => (
+                <div key={site} className="flex items-center justify-between p-3 bg-arion-bg/50 border border-arion-border rounded-sm group hover:border-arion-primary/30 transition-colors">
+                  <span className="text-[10px] font-mono text-zinc-400">{site}</span>
+                  <button 
+                    onClick={() => handleRemoveSite(site)}
+                    className="text-zinc-600 hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition-all"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* Notion Integration */}
       <section className="bg-arion-card border border-arion-border rounded-sm overflow-hidden shadow-2xl">
@@ -56,6 +149,8 @@ export default function Settings() {
               </div>
               <input 
                 type="password" 
+                value={settings.notionToken || ''}
+                onChange={(e) => updateSettings({ notionToken: e.target.value })}
                 placeholder="secret_..." 
                 className="w-full bg-arion-bg border border-arion-border rounded-sm px-4 py-3 text-xs focus:outline-none focus:border-arion-primary transition-colors text-arion-text-bright"
               />
@@ -67,6 +162,8 @@ export default function Settings() {
               </div>
               <input 
                 type="text" 
+                value={settings.notionDatabaseId || ''}
+                onChange={(e) => updateSettings({ notionDatabaseId: e.target.value })}
                 placeholder="0281..." 
                 className="w-full bg-arion-bg border border-arion-border rounded-sm px-4 py-3 text-xs focus:outline-none focus:border-arion-primary transition-colors text-arion-text-bright"
               />
@@ -74,7 +171,7 @@ export default function Settings() {
           </div>
           <div className="flex items-center gap-2 p-3 bg-arion-primary/5 border border-arion-primary/10 rounded-sm">
             <ShieldCheck className="w-4 h-4 text-arion-primary" />
-            <p className="text-[10px] text-arion-text-muted italic">API tokens are stored in your encrypted local Chrome storage.</p>
+            <p className="text-[10px] text-arion-text-muted italic">API tokens are stored in your encrypted cloud profile.</p>
           </div>
         </div>
       </section>
@@ -95,15 +192,15 @@ export default function Settings() {
             </div>
           </div>
           <button 
-            onClick={() => setIncognitoEnabled(!incognitoEnabled)}
+            onClick={() => updateSettings({ incognitoBlocker: !settings.incognitoBlocker })}
             className={cn(
               "w-10 h-5 rounded-full p-0.5 transition-colors relative",
-              incognitoEnabled ? "bg-red-500" : "bg-arion-border"
+              settings.incognitoBlocker ? "bg-red-500" : "bg-arion-border"
             )}
           >
             <div className={cn(
               "w-4 h-4 bg-arion-bg rounded-full transition-transform",
-              incognitoEnabled ? "translate-x-5" : "translate-x-0"
+              settings.incognitoBlocker ? "translate-x-5" : "translate-x-0"
             )} />
           </button>
         </div>
