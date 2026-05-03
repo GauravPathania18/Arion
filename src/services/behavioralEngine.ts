@@ -1,4 +1,5 @@
 import { SiteUsage, FocusSession, BehavioralMetrics } from '../types';
+import { PRODUCTIVE_SITES, DISTRACTING_SITES } from '../constants';
 
 export interface TabEngagement {
   domain: string;
@@ -13,6 +14,13 @@ export interface DisciplineState {
   consecutiveBreaks: number;
   isAutoTightened: boolean;
   strictness: number; // 0 to 1
+}
+
+
+export function getSiteCategory(domain: string): 'productive' | 'distracting' | 'neutral' {
+  if (PRODUCTIVE_SITES.some(p => domain.includes(p))) return 'productive';
+  if (DISTRACTING_SITES.some(d => domain.includes(d))) return 'distracting';
+  return 'neutral';
 }
 
 /**

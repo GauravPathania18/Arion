@@ -1,7 +1,42 @@
 import { GoogleGenAI } from "@google/genai";
-import { DayData, BehavioralMetrics } from "../types";
+import { DayData, BehavioralMetrics, FocusSession, SiteUsage } from "../types";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+
+export async function generateSessionSummary(session: FocusSession, siteUsage: SiteUsage[], metrics: BehavioralMetrics) {
+  const prompt = `
+    Analyze this finished Focus Session:
+    
+    SESSION DETAILS:
+    - Target Duration: ${session.duration} minutes
+    - Completion Status: ${session.completed ? 'SUCCESSFUL' : 'ABANDONED'}
+    - Distractions Blocked: ${session.distractionsBlocked}
+    
+    BEHAVIORAL DATA DURING SESSION:
+    - Sites Visited: ${siteUsage.map(s => `${s.domain} (${Math.round(s.timeSpent / 60)}m)`).join(', ')}
+    - Tab Switch Rate: ${metrics.tabSwitchFrequency} switches/min
+    - Dopamine Loop Risk: ${metrics.dopamineLoopDetected ? 'HIGH' : 'LOW'}
+    
+    TASK:
+    1. SUMMARY: Provide a 1-sentence punchy summary of their performance.
+    2. BEHAVIORAL OBSERVATION: Note one specific positive or negative behavior pattern observed.
+    3. IMPROVEMENT: Suggest one tiny adjustment for the next session.
+    
+    Tone: Sophisticated, clinical, high-performance coaching style. Use Markdown.
+    Be concise (max 100 words).
+  `;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: prompt,
+    });
+    return response.text;
+  } catch (error) {
+    console.error("AI Session Summary Error:", error);
+    return "Session completed. Great work staying focused.";
+  }
+}
 
 export async function generateProductivityInsights(data: DayData[], metrics: BehavioralMetrics) {
   const prompt = `

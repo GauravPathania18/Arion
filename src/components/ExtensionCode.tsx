@@ -16,7 +16,7 @@ const codeFiles = [
     lang: 'json',
     code: `{
   "manifest_version": 3,
-  "name": "Aura Focus AI",
+  "name": "Arion Focus AI",
   "version": "1.0.0",
   "description": "AI-powered productivity system.",
   "permissions": [
@@ -124,7 +124,7 @@ function applyDegradation() {
       animation: none !important;
     }
     body::before {
-      content: "AURA: GRAY MODE ACTIVE";
+      content: "ARION: GRAY MODE ACTIVE";
       position: fixed;
       top: 0; left: 0; right: 0;
       background: #C4A484;
@@ -167,8 +167,8 @@ export default function ExtensionCode() {
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 min-h-[600px]">
       <div className="space-y-6">
         <div>
-          <h2 className="text-2xl font-serif italic tracking-tighter text-aura-primary mb-2">Extension Code</h2>
-          <p className="text-aura-text-muted text-[10px] uppercase font-bold tracking-widest mt-4">
+          <h2 className="text-2xl font-serif italic tracking-tighter text-arion-primary mb-2">Extension Code</h2>
+          <p className="text-arion-text-muted text-[10px] uppercase font-bold tracking-widest mt-4">
             Code for your browser extension.
           </p>
         </div>
@@ -181,8 +181,8 @@ export default function ExtensionCode() {
               className={cn(
                 "w-full flex items-center justify-between p-4 rounded-sm border transition-all",
                 selectedFile.name === file.name 
-                  ? "bg-aura-primary/5 border-aura-primary text-aura-primary" 
-                  : "bg-aura-bg border-aura-border text-aura-text-muted hover:border-aura-text-bright"
+                  ? "bg-arion-primary/5 border-arion-primary text-arion-primary" 
+                  : "bg-arion-bg border-arion-border text-arion-text-muted hover:border-arion-text-bright"
               )}
             >
               <div className="flex items-center gap-3">
@@ -194,37 +194,67 @@ export default function ExtensionCode() {
           ))}
         </div>
 
-        <div className="p-6 bg-aura-card rounded-sm border border-aura-border">
+        <div className="p-6 bg-arion-card rounded-sm border border-arion-border">
            <div className="flex items-center gap-3 mb-4">
-              <ShieldIcon className="w-5 h-5 text-aura-primary" />
+              <ShieldIcon className="w-5 h-5 text-arion-primary" />
               <h3 className="font-serif italic text-white">Privacy Guard</h3>
            </div>
-           <p className="text-[10px] text-aura-text-muted leading-relaxed uppercase tracking-widest font-bold mb-3">Manifest V3 Strict</p>
-           <p className="text-[11px] text-aura-text-muted leading-relaxed italic">
-             Aura uses the <code className="text-aura-primary font-mono not-italic">declarativeNetRequest</code> API 
+           <p className="text-[10px] text-arion-text-muted leading-relaxed uppercase tracking-widest font-bold mb-3">Manifest V3 Strict</p>
+           <p className="text-[11px] text-arion-text-muted leading-relaxed italic">
+             Arion uses the <code className="text-arion-primary font-mono not-italic">declarativeNetRequest</code> API 
              to block sites without intercepting your actual content.
            </p>
         </div>
       </div>
 
-      <div className="lg:col-span-2 flex flex-col bg-aura-card border border-aura-border rounded-sm overflow-hidden shadow-2xl">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-aura-border bg-aura-bg">
+      <div className="lg:col-span-2 flex flex-col bg-arion-card border border-arion-border rounded-sm overflow-hidden shadow-2xl relative">
+        <div className="absolute top-0 left-0 w-full h-1 bg-arion-primary/50 shadow-[0_0_15px_rgba(196,164,132,0.3)]" />
+        <div className="flex items-center justify-between px-6 py-4 border-b border-arion-border bg-arion-bg">
           <div className="flex items-center gap-4">
-            <Terminal className="w-4 h-4 text-aura-text-muted" />
-            <span className="text-[10px] uppercase font-bold tracking-widest text-aura-text-muted">{selectedFile.name}</span>
+            <div className="flex gap-1.5">
+              <div className="w-2.5 h-2.5 rounded-full bg-red-500/20 border border-red-500/30" />
+              <div className="w-2.5 h-2.5 rounded-full bg-amber-500/20 border border-amber-500/30" />
+              <div className="w-2.5 h-2.5 rounded-full bg-emerald-500/20 border border-emerald-500/30" />
+            </div>
+            <div className="h-4 w-px bg-arion-border/50 mx-1" />
+            <div className="flex items-center gap-2">
+              <Terminal className="w-3.5 h-3.5 text-arion-text-muted" />
+              <span className="text-[10px] uppercase font-black tracking-[0.2em] text-arion-text-muted">{selectedFile.name}</span>
+            </div>
           </div>
           <button 
             onClick={handleCopy}
-            className="flex items-center gap-2 px-4 py-2 border border-aura-border bg-aura-card hover:bg-aura-bg transition-colors text-[10px] tracking-widest font-bold text-aura-primary uppercase"
+            className="flex items-center gap-2 px-4 py-2 bg-arion-primary/10 border border-arion-primary/30 hover:bg-arion-primary/20 transition-all text-[9px] tracking-[0.2em] font-black text-arion-primary uppercase rounded-sm"
           >
             {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-            {copied ? 'Copied' : 'Copy Code'}
+            {copied ? 'Captured' : 'Copy Source'}
           </button>
         </div>
-        <div className="flex-1 p-6 font-mono text-sm overflow-auto bg-zinc-950/50">
-          <pre className="text-zinc-400 leading-relaxed">
-            {selectedFile.code}
+        <div className="flex-1 p-8 font-mono text-xs overflow-auto bg-[#080808] selection:bg-arion-primary/30 selection:text-white">
+          <pre className="text-zinc-400 leading-loose">
+            {selectedFile.code.split('\n').map((line, i) => (
+              <div key={i} className="flex gap-6 group">
+                <span className="w-8 text-right text-zinc-700 select-none group-hover:text-zinc-500 transition-colors uppercase font-mono text-[9px] pt-0.5">{(i + 1).toString().padStart(2, '0')}</span>
+                <span className={cn(
+                  "flex-1",
+                  line.trim().startsWith('//') ? "text-zinc-600 italic" : 
+                  line.includes('"') || line.includes("'") ? "text-arion-primary/90" :
+                  line.match(/\b(function|async|await|const|let|return|if|else|addListener)\b/) ? "text-white font-bold" : "text-zinc-400"
+                )}>{line}</span>
+              </div>
+            ))}
           </pre>
+        </div>
+        
+        <div className="px-6 py-3 border-t border-arion-border bg-arion-bg flex justify-between items-center">
+          <div className="flex items-center gap-4 text-[9px] text-arion-text-muted uppercase font-bold tracking-widest">
+            <span className="flex items-center gap-1.5 font-mono">
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              UTF-8
+            </span>
+            <span className="font-mono">Ln {selectedFile.code.split('\n').length}</span>
+          </div>
+          <p className="text-[9px] text-arion-text-muted italic">Ready for sideloading.</p>
         </div>
       </div>
     </div>

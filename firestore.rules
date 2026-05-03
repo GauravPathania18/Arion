@@ -1,0 +1,92 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helpers ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- Validation Blueprints ---
+
+    function isValidUserProfile(data) {
+      return data.email is string && data.email.size() <= 256
+        && (data.displayName == null || (data.displayName is string && data.displayName.size() <= 128))
+        && data.createdAt is string
+        && (data.disciplineLevel == null || data.disciplineLevel in ['Bronze', 'Silver', 'Gold', 'Platinum'])
+        && (data.progressionPoints == null || data.progressionPoints is number);
+    }
+
+    function isValidDayData(data) {
+      return data.date is string && data.date.size() <= 10
+        && data.totalActiveTime is number
+        && data.focusScore is number;
+    }
+
+    function isValidSiteUsage(data) {
+      return data.domain is string && data.domain.size() <= 256
+        && data.timeSpent is number
+        && data.visits is number
+        && data.category in ['productive', 'distracting', 'neutral']
+        && data.lastVisited is number;
+    }
+
+    function isValidFocusSession(data) {
+      return data.startTime is number
+        && data.duration is number
+        && data.completed is bool
+        && (data.distractionsBlocked == null || data.distractionsBlocked is number);
+    }
+
+    // --- Rules ---
+
+    match /users/{userId} {
+      allow get: if isOwner(userId) && isValidId(userId);
+      allow create: if isOwner(userId) && isValidId(userId) && isValidUserProfile(incoming());
+      allow update: if isOwner(userId) && isValidId(userId) && isValidUserProfile(incoming())
+        && incoming().createdAt == existing().createdAt; // Immutable field
+
+      match /history/{dayId} {
+        allow list: if isOwner(userId) && isValidId(userId);
+        allow get: if isOwner(userId) && isValidId(userId) && isValidId(dayId);
+        allow create: if isOwner(userId) && isValidId(userId) && isValidId(dayId) && isValidDayData(incoming());
+        allow update: if isOwner(userId) && isValidId(userId) && isValidId(dayId) && isValidDayData(incoming());
+
+        match /sites/{siteId} {
+          allow list: if isOwner(userId) && isValidId(userId);
+          allow get: if isOwner(userId) && isValidId(userId) && isValidId(dayId) && isValidId(siteId);
+          allow create: if isOwner(userId) && isValidId(userId) && isValidId(dayId) && isValidId(siteId) && isValidSiteUsage(incoming());
+          allow update: if isOwner(userId) && isValidId(userId) && isValidId(dayId) && isValidId(siteId) && isValidSiteUsage(incoming());
+        }
+      }
+
+      match /sessions/{sessionId} {
+        allow list: if isOwner(userId) && isValidId(userId);
+        allow get: if isOwner(userId) && isValidId(userId) && isValidId(sessionId);
+        allow create: if isOwner(userId) && isValidId(userId) && isValidId(sessionId) && isValidFocusSession(incoming());
+        allow update: if isOwner(userId) && isValidId(userId) && isValidId(sessionId) && isValidFocusSession(incoming())
+          && incoming().startTime == existing().startTime; // Immutable field
+      }
+    }
+  }
+}

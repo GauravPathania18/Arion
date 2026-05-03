@@ -1,5 +1,5 @@
 {
-  "name": "Aura: AI Behavioral Productivity Hub",
+  "name": "Arion: AI Behavioral Productivity Hub",
   "description": "An AI-powered productivity system with behavioral analytics, incognito restrictions, and focus intelligence.",
   "requestFramePermissions": ["notifications"],
   "majorCapabilities": ["analytics", "ai_coaching", "behavioral_intelligence"]

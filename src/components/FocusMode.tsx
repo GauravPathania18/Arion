@@ -12,6 +12,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { DisciplineState, getDisciplineRequirements, updateDiscipline, detectDopamineLoops } from '../services/behavioralEngine';
+import { PRODUCTIVE_SITES, DISTRACTING_SITES } from '../constants';
 import { useProductivity } from '../ProductivityContext';
 
 export default function FocusMode() {
@@ -94,7 +95,7 @@ export default function FocusMode() {
     // Simulation: Periodically generate random engagements to test the system
     // In a real extension, these would be real tab switches
     const simulationInterval = setInterval(() => {
-      const domains = ['twitter.com', 'reddit.com', 'youtube.com', 'news.ycombinator.com', 'github.com'];
+      const domains = [...DISTRACTING_SITES.slice(0, 4), ...PRODUCTIVE_SITES.slice(0, 2)];
       const randomDomain = domains[Math.floor(Math.random() * domains.length)];
       // Force a "micro-stay" simulation occasionally
       const duration = Math.random() > 0.7 ? Math.floor(Math.random() * 4) + 1 : Math.floor(Math.random() * 60) + 10;
@@ -124,8 +125,7 @@ export default function FocusMode() {
             .sort((a, b) => b[1] - a[1]);
           
           const mostFrequent = sortedDomains[0]?.[0];
-          const productiveDomains = ['github.com', 'stackoverflow.com', 'docs.google.com', 'notion.so', 'figma.com', 'linear.app', 'vercel.com'];
-          const isProductive = productiveDomains.some(d => mostFrequent?.includes(d));
+          const isProductive = PRODUCTIVE_SITES.some(d => mostFrequent?.includes(d));
 
           if (isProductive) {
             setSuggestion({ type: 'duration', value: '15' });
@@ -209,14 +209,14 @@ export default function FocusMode() {
   return (
     <div className="max-w-4xl mx-auto space-y-12 py-8">
       {/* Discipline Header */}
-      <div className="flex items-center justify-between bg-aura-card border border-aura-border p-6 rounded-sm shadow-2xl">
+      <div className="flex items-center justify-between bg-arion-card border border-arion-border p-6 rounded-sm shadow-2xl">
         <div className="flex items-center gap-4">
-          <div className="p-3 bg-aura-bg border border-aura-border rounded-sm">
+          <div className="p-3 bg-arion-bg border border-arion-border rounded-sm">
             <Trophy className="w-6 h-6" style={{ color: requirements.color }} />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-xl font-serif italic tracking-tighter text-aura-primary">Focus Level: {discipline.level}</h2>
+              <h2 className="text-xl font-serif italic tracking-tighter text-arion-primary">Focus Level: {discipline.level}</h2>
               {discipline.isAutoTightened && (
                 <span className="px-2 py-0.5 bg-red-500/10 border border-red-500/20 text-red-500 text-[8px] uppercase font-bold tracking-widest rounded-sm">
                   Extra Strict
@@ -232,49 +232,49 @@ export default function FocusMode() {
                         <div key={i} className={cn(
                           "w-5 h-1.5 rounded-full transition-all duration-500",
                           i <= discipline.consecutiveSuccesses 
-                            ? "bg-aura-primary shadow-[0_0_8px_rgba(196,164,132,0.4)]" 
-                            : "bg-aura-border/40"
+                            ? "bg-arion-primary shadow-[0_0_8px_rgba(196,164,132,0.4)]" 
+                            : "bg-arion-border/40"
                         )} />
                       ))}
                     </div>
-                    <p className="text-[10px] text-aura-text-muted uppercase font-bold tracking-widest">
+                    <p className="text-[10px] text-arion-text-muted uppercase font-bold tracking-widest">
                       Focus Streak
                     </p>
                   </div>
                 </div>
                 <div className="flex items-baseline gap-1">
-                  <span className="text-sm font-bold text-aura-primary tabular-nums">{discipline.progressionPoints}</span>
-                  <span className="text-[9px] text-aura-text-muted uppercase font-bold tracking-tighter">Points Earned</span>
+                  <span className="text-sm font-bold text-arion-primary tabular-nums">{discipline.progressionPoints}</span>
+                  <span className="text-[9px] text-arion-text-muted uppercase font-bold tracking-tighter">Points Earned</span>
                 </div>
               </div>
 
               {/* Advanced Progression Bar */}
               <div className="space-y-1.5">
                 <div className="flex justify-between items-end px-0.5">
-                  <p className="text-[9px] text-aura-text-muted uppercase font-black tracking-widest">
+                  <p className="text-[9px] text-arion-text-muted uppercase font-black tracking-widest">
                     Next Level Progression
                   </p>
-                  <p className="text-[10px] font-bold text-aura-primary">
+                  <p className="text-[10px] font-bold text-arion-primary">
                     {discipline.consecutiveSuccesses}/5 Sessions
                   </p>
                 </div>
-                <div className="h-2 w-full bg-aura-bg border border-aura-border rounded-full overflow-hidden relative">
+                <div className="h-2 w-full bg-arion-bg border border-arion-border rounded-full overflow-hidden relative">
                   <motion.div 
                     initial={{ width: 0 }}
                     animate={{ width: `${(discipline.consecutiveSuccesses / 5) * 100}%` }}
-                    className="h-full bg-aura-primary relative z-10"
+                    className="h-full bg-arion-primary relative z-10"
                   />
                   {/* Subtle Grid markers */}
                   <div className="absolute inset-0 flex justify-between px-[20%]">
                     {[1, 2, 3, 4].map(i => (
-                      <div key={i} className="h-full w-px bg-aura-border/30" />
+                      <div key={i} className="h-full w-px bg-arion-border/30" />
                     ))}
                   </div>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 pt-1 border-t border-aura-border/30">
-                <p className="text-[9px] text-aura-text-muted uppercase font-bold tracking-widest">
+              <div className="flex items-center gap-2 pt-1 border-t border-arion-border/30">
+                <p className="text-[9px] text-arion-text-muted uppercase font-bold tracking-widest">
                   Recent Breaks
                 </p>
                 <div className="flex gap-1">
@@ -283,7 +283,7 @@ export default function FocusMode() {
                       "w-3 h-1 rounded-full transition-all duration-500",
                       i <= discipline.consecutiveBreaks 
                         ? "bg-red-500/80 shadow-[0_0_6px_rgba(239,68,68,0.3)]" 
-                        : "bg-aura-border/30"
+                        : "bg-arion-border/30"
                     )} />
                   ))}
                 </div>
@@ -297,8 +297,8 @@ export default function FocusMode() {
           </div>
         </div>
         <div className="text-right">
-          <p className="text-[10px] text-aura-text-muted tracking-widest uppercase font-bold mb-1">How to Unblock</p>
-          <p className="text-sm font-serif italic text-aura-primary">{requirements.overrideFriction}</p>
+          <p className="text-[10px] text-arion-text-muted tracking-widest uppercase font-bold mb-1">How to Unblock</p>
+          <p className="text-sm font-serif italic text-arion-primary">{requirements.overrideFriction}</p>
         </div>
       </div>
 
@@ -311,7 +311,7 @@ export default function FocusMode() {
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9 }}
-              className="absolute -top-12 z-50 bg-aura-primary text-aura-bg px-6 py-2 rounded-sm shadow-2xl flex items-center gap-3"
+              className="absolute -top-12 z-50 bg-arion-primary text-arion-bg px-6 py-2 rounded-sm shadow-2xl flex items-center gap-3"
             >
               <Trophy className="w-4 h-4" />
               <span className="text-[10px] uppercase font-black tracking-widest">Session Complete +25 Points</span>
@@ -360,11 +360,11 @@ export default function FocusMode() {
               <motion.div 
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="bg-aura-card border border-aura-primary p-3 rounded-sm shadow-2xl flex flex-col items-center gap-2 max-w-[280px]"
+                className="bg-arion-card border border-arion-primary p-3 rounded-sm shadow-2xl flex flex-col items-center gap-2 max-w-[280px]"
               >
                 <div className="flex items-center gap-2">
-                  <TrendingUp className="w-3 h-3 text-aura-primary" />
-                  <p className="text-[9px] text-aura-text-muted uppercase font-bold tracking-widest text-center leading-tight">
+                  <TrendingUp className="w-3 h-3 text-arion-primary" />
+                  <p className="text-[9px] text-arion-text-muted uppercase font-bold tracking-widest text-center leading-tight">
                     {suggestion.type === 'site' 
                       ? `Frequent visits to ${suggestion.value} detected. Block it?`
                       : `You're working hard! Want to add ${suggestion.value}m to this session?`}
@@ -377,13 +377,13 @@ export default function FocusMode() {
                       else setTimeLeft(prev => prev + (parseInt(suggestion.value) * 60));
                       setSuggestion(null);
                     }}
-                    className="flex-1 px-3 py-1 bg-aura-primary text-aura-bg text-[8px] uppercase font-bold tracking-widest rounded-sm"
+                    className="flex-1 px-3 py-1 bg-arion-primary text-arion-bg text-[8px] uppercase font-bold tracking-widest rounded-sm"
                   >
                     Accept
                   </button>
                   <button 
                     onClick={() => setSuggestion(null)}
-                    className="flex-1 px-3 py-1 bg-aura-bg border border-aura-border text-aura-text-muted text-[8px] uppercase font-bold tracking-widest rounded-sm"
+                    className="flex-1 px-3 py-1 bg-arion-bg border border-arion-border text-arion-text-muted text-[8px] uppercase font-bold tracking-widest rounded-sm"
                   >
                     Ignore
                   </button>
@@ -398,7 +398,7 @@ export default function FocusMode() {
           {/* Animated Glow */}
           <div className={cn(
             "absolute inset-0 rounded-full blur-[100px] transition-all duration-1000 opacity-20",
-            isActive ? (isLastMinute ? "bg-red-500" : "bg-aura-primary") : "bg-zinc-700"
+            isActive ? (isLastMinute ? "bg-red-500" : "bg-arion-primary") : "bg-zinc-700"
           )} />
           
           <svg className="w-full h-full -rotate-90">
@@ -407,7 +407,7 @@ export default function FocusMode() {
               fill="transparent" 
               stroke="currentColor" 
               strokeWidth="4" 
-              className="text-aura-border/30"
+              className="text-arion-border/30"
             />
             {/* Background dashed ring */}
             <circle 
@@ -416,7 +416,7 @@ export default function FocusMode() {
               stroke="currentColor" 
               strokeWidth="1" 
               strokeDasharray="4 8"
-              className="text-aura-border/20"
+              className="text-arion-border/20"
             />
             <motion.circle 
               cx="160" cy="160" r="140" 
@@ -465,14 +465,14 @@ export default function FocusMode() {
               transition={{ repeat: Infinity, duration: 1 }}
               className={cn(
                 "text-7xl font-serif font-bold tracking-tighter tabular-nums transition-colors duration-500",
-                isLastMinute && isActive ? "text-red-500" : "text-aura-primary"
+                isLastMinute && isActive ? "text-red-500" : "text-arion-primary"
               )}
             >
               {formatTime(timeLeft)}
             </motion.span>
             <span className={cn(
               "text-[10px] mt-4 font-bold tracking-[0.3em] uppercase transition-colors",
-              isLastMinute && isActive ? "text-red-500 animate-pulse" : "text-aura-text-muted text-aura-text-muted"
+              isLastMinute && isActive ? "text-red-500 animate-pulse" : "text-arion-text-muted"
             )}>
               {isActive ? (isLastMinute ? 'Final Stretch' : 'In Session') : 'Ready to Focus'}
             </span>
@@ -484,7 +484,7 @@ export default function FocusMode() {
                   key={i} 
                   className={cn(
                     "w-1 h-1 rounded-full",
-                    (timeLeft / 60) < (requirements.sessionDuration - (i * 15)) ? "bg-aura-primary" : "bg-aura-border"
+                    (timeLeft / 60) < (requirements.sessionDuration - (i * 15)) ? "bg-arion-primary" : "bg-arion-border"
                   )} 
                 />
               ))}
@@ -502,7 +502,7 @@ export default function FocusMode() {
                 startSession(requirements.sessionDuration);
               }
             }}
-            className="w-16 h-16 rounded-sm bg-aura-primary text-aura-bg flex items-center justify-center hover:scale-105 transition-transform active:scale-95 shadow-2xl shadow-aura-primary/20"
+            className="w-16 h-16 rounded-sm bg-arion-primary text-arion-bg flex items-center justify-center hover:scale-105 transition-transform active:scale-95 shadow-2xl shadow-arion-primary/20"
           >
             {isActive ? <Pause fill="currentColor" /> : <Play fill="currentColor" className="ml-1" />}
           </button>
@@ -514,7 +514,7 @@ export default function FocusMode() {
                 }
                 setTimeLeft(requirements.sessionDuration * 60); 
             }}
-            className="w-12 h-12 rounded-sm bg-aura-bg border border-aura-border text-aura-text-muted flex items-center justify-center hover:text-aura-text-bright transition-colors"
+            className="w-12 h-12 rounded-sm bg-arion-bg border border-arion-border text-arion-text-muted flex items-center justify-center hover:text-arion-text-bright transition-colors"
           >
             <RotateCcw className="w-5 h-5" />
           </button>
@@ -523,21 +523,21 @@ export default function FocusMode() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Guard Configuration */}
-        <div className="bg-aura-card border border-aura-border p-6 rounded-sm shadow-xl">
+        <div className="bg-arion-card border border-arion-border p-6 rounded-sm shadow-xl">
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-3">
-              <Shield className="w-5 h-5 text-aura-primary" />
+              <Shield className="w-5 h-5 text-arion-primary" />
               <h3 className="font-serif italic tracking-wide">Focus Settings</h3>
             </div>
             <button 
               onClick={() => setIsBlocking(!isBlocking)}
               className={cn(
                 "w-10 h-5 rounded-full p-0.5 transition-colors relative",
-                isBlocking ? "bg-aura-primary" : "bg-aura-border"
+                isBlocking ? "bg-arion-primary" : "bg-arion-border"
               )}
             >
               <div className={cn(
-                "w-4 h-4 bg-aura-bg rounded-full transition-transform",
+                "w-4 h-4 bg-arion-bg rounded-full transition-transform",
                 isBlocking ? "translate-x-5" : "translate-x-0"
               )} />
             </button>
@@ -550,14 +550,14 @@ export default function FocusMode() {
               { label: 'Gray Mode', desc: 'Turn sites gray & hide images', active: true },
               { label: 'Tab Switch Alert', desc: 'Alerts when you switch tabs too often', active: true },
             ].map((rule) => (
-              <div key={rule.label} className="p-4 bg-aura-bg border border-aura-border rounded-sm flex items-center justify-between group">
+              <div key={rule.label} className="p-4 bg-arion-bg border border-arion-border rounded-sm flex items-center justify-between group">
                 <div>
                   <p className="text-xs font-bold uppercase tracking-widest">{rule.label}</p>
-                  <p className="text-[10px] text-aura-text-muted mt-1">{rule.desc}</p>
+                  <p className="text-[10px] text-arion-text-muted mt-1">{rule.desc}</p>
                 </div>
                 <div className={cn(
                   "w-1.5 h-1.5 rounded-full",
-                  rule.active ? "bg-aura-primary shadow-[0_0_8px_rgba(196,164,132,0.5)]" : "bg-aura-border"
+                  rule.active ? "bg-arion-primary shadow-[0_0_8px_rgba(196,164,132,0.5)]" : "bg-arion-border"
                 )} />
               </div>
             ))}
@@ -565,12 +565,12 @@ export default function FocusMode() {
         </div>
 
         {/* Override Friction */}
-        <div className="bg-aura-card border border-aura-border p-6 rounded-sm shadow-xl">
+        <div className="bg-arion-card border border-arion-border p-6 rounded-sm shadow-xl">
           <div className="flex items-center gap-3 mb-8">
-            <AlertTriangle className="w-5 h-5 text-aura-primary" />
+            <AlertTriangle className="w-5 h-5 text-arion-primary" />
             <h3 className="font-serif italic tracking-wide">Wait Time</h3>
           </div>
-          <p className="text-[10px] text-aura-text-muted mb-6 leading-relaxed uppercase tracking-wider font-bold">
+          <p className="text-[10px] text-arion-text-muted mb-6 leading-relaxed uppercase tracking-wider font-bold">
             Staying focused helps you improve.
           </p>
           
@@ -583,10 +583,10 @@ export default function FocusMode() {
             ].map((level) => (
               <button 
                 key={level.label}
-                className="p-3 bg-aura-bg border border-aura-border rounded-sm text-left hover:border-aura-primary/50 transition-all group"
+                className="p-3 bg-arion-bg border border-arion-border rounded-sm text-left hover:border-arion-primary/50 transition-all group"
               >
-                <p className="text-[10px] font-bold text-aura-text-bright uppercase tracking-widest group-hover:text-aura-primary transition-colors">{level.label}</p>
-                <p className="text-[9px] text-aura-text-muted mt-0.5 italic">{level.val}</p>
+                <p className="text-[10px] font-bold text-arion-text-bright uppercase tracking-widest group-hover:text-arion-primary transition-colors">{level.label}</p>
+                <p className="text-[9px] text-arion-text-muted mt-0.5 italic">{level.val}</p>
               </button>
             ))}
           </div>
@@ -594,26 +594,26 @@ export default function FocusMode() {
       </div>
 
       {/* Site Management */}
-      <div className="bg-aura-card border border-aura-border p-6 rounded-sm shadow-2xl transition-all duration-300 relative overflow-hidden">
+      <div className="bg-arion-card border border-arion-border p-6 rounded-sm shadow-2xl transition-all duration-300 relative overflow-hidden">
         {/* Override Pending Overlay */}
         {isOverridePending && (
           <motion.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="absolute inset-0 z-50 bg-aura-bg/95 backdrop-blur-sm flex flex-col items-center justify-center p-8 text-center"
+            className="absolute inset-0 z-50 bg-arion-bg/95 backdrop-blur-sm flex flex-col items-center justify-center p-8 text-center"
           >
             <AlertTriangle className="w-12 h-12 text-red-500 mb-4 animate-pulse" />
-            <h3 className="text-xl font-serif italic text-aura-primary mb-2">Stop! Focus first.</h3>
-            <p className="text-[10px] text-aura-text-muted uppercase tracking-[0.3em] mb-8 font-bold">Waiting time active</p>
+            <h3 className="text-xl font-serif italic text-arion-primary mb-2">Stop! Focus first.</h3>
+            <p className="text-[10px] text-arion-text-muted uppercase tracking-[0.3em] mb-8 font-bold">Waiting time active</p>
             
-            <div className="text-6xl font-serif text-aura-text-bright tabular-nums mb-4">
+            <div className="text-6xl font-serif text-arion-text-bright tabular-nums mb-4">
               {overrideTimeLeft}s
             </div>
             
             {overrideReason && (
-              <div className="mb-6 p-4 bg-aura-primary/5 border border-aura-primary/20 rounded-sm">
-                <p className="text-[10px] text-aura-text-muted uppercase tracking-widest font-bold mb-1">Your Reason:</p>
-                <p className="text-sm font-serif italic text-aura-primary">"{overrideReason}"</p>
+              <div className="mb-6 p-4 bg-arion-primary/5 border border-arion-primary/20 rounded-sm">
+                <p className="text-[10px] text-arion-text-muted uppercase tracking-widest font-bold mb-1">Your Reason:</p>
+                <p className="text-sm font-serif italic text-arion-primary">"{overrideReason}"</p>
               </div>
             )}
             
@@ -625,7 +625,7 @@ export default function FocusMode() {
 
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-3">
-            <Shield className={cn("w-5 h-5", isBlocking ? "text-aura-primary" : "text-green-500")} />
+            <Shield className={cn("w-5 h-5", isBlocking ? "text-arion-primary" : "text-green-500")} />
             <h3 className="font-serif italic tracking-wide">
               {isBlocking ? "Blocked Sites" : "Sites Unblocked"}
             </h3>
@@ -642,7 +642,7 @@ export default function FocusMode() {
                   const reason = prompt("Enter your reason for unblocking:");
                   if (reason) triggerBreachProtocol(reason);
                 }}
-                className="px-3 py-1 border border-aura-primary/30 text-aura-primary text-[8px] uppercase font-bold tracking-widest rounded-sm hover:bg-aura-primary/10 transition-colors"
+                className="px-3 py-1 border border-arion-primary/30 text-arion-primary text-[8px] uppercase font-bold tracking-widest rounded-sm hover:bg-arion-primary/10 transition-colors"
               >
                 Ask to Unblock
               </button>
@@ -657,18 +657,18 @@ export default function FocusMode() {
         </div>
         
         <form onSubmit={addSite} className="flex flex-col gap-3 mb-6">
-          <label className="text-[10px] text-aura-text-muted uppercase font-bold tracking-widest ml-1">Add a website you find distracting:</label>
+          <label className="text-[10px] text-arion-text-muted uppercase font-bold tracking-widest ml-1">Add a website you find distracting:</label>
           <div className="flex gap-2">
             <input 
               type="text" 
               value={newSite}
               onChange={(e) => setNewSite(e.target.value)}
               placeholder="e.g. youtube.com" 
-              className="flex-1 bg-aura-bg border border-aura-border rounded-sm px-4 py-3 text-xs placeholder:italic focus:outline-none focus:border-aura-primary transition-colors text-aura-text-bright"
+              className="flex-1 bg-arion-bg border border-arion-border rounded-sm px-4 py-3 text-xs placeholder:italic focus:outline-none focus:border-arion-primary transition-colors text-arion-text-bright"
             />
             <button 
               type="submit"
-              className="px-6 py-2 bg-aura-primary text-aura-bg text-[10px] uppercase font-bold tracking-widest rounded-sm hover:scale-105 transition-all"
+              className="px-6 py-2 bg-arion-primary text-arion-bg text-[10px] uppercase font-bold tracking-widest rounded-sm hover:scale-105 transition-all"
             >
               Block Site
             </button>
@@ -679,9 +679,9 @@ export default function FocusMode() {
           {blockedSites.map((site) => (
             <div 
               key={site} 
-              className="flex items-center justify-between p-3 bg-aura-bg border border-aura-border rounded-sm group hover:border-aura-primary/30 transition-all"
+              className="flex items-center justify-between p-3 bg-arion-bg border border-arion-border rounded-sm group hover:border-arion-primary/30 transition-all"
             >
-              <span className="text-[10px] font-mono text-aura-text-muted truncate mr-2 italic">{site}</span>
+              <span className="text-[10px] font-mono text-arion-text-muted truncate mr-2 italic">{site}</span>
               <button 
                 onClick={() => removeSite(site)}
                 className="text-[10px] text-red-500/50 hover:text-red-500 font-bold opacity-0 group-hover:opacity-100 transition-all uppercase tracking-tighter"
@@ -693,8 +693,8 @@ export default function FocusMode() {
         </div>
         
         {blockedSites.length === 0 && (
-          <div className="text-center py-8 border border-dashed border-aura-border rounded-sm">
-            <p className="text-[10px] text-aura-text-muted uppercase tracking-widest italic">No restrictions active. Your perimeter is open.</p>
+          <div className="text-center py-8 border border-dashed border-arion-border rounded-sm">
+            <p className="text-[10px] text-arion-text-muted uppercase tracking-widest italic">No restrictions active. Your perimeter is open.</p>
           </div>
         )}
       </div>

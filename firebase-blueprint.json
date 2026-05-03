@@ -1,0 +1,71 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "User specific settings and metadata",
+      "type": "object",
+      "properties": {
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "disciplineLevel": { "type": "string", "enum": ["Bronze", "Silver", "Gold", "Platinum"] },
+        "progressionPoints": { "type": "number" }
+      },
+      "required": ["email", "createdAt"]
+    },
+    "DayData": {
+      "title": "Day Productivity Data",
+      "description": "Summarized productivity data for a single day",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string", "description": "YYYY-MM-DD" },
+        "totalActiveTime": { "type": "number" },
+        "focusScore": { "type": "number" }
+      },
+      "required": ["date", "totalActiveTime", "focusScore"]
+    },
+    "SiteUsage": {
+      "title": "Site Usage Statistic",
+      "description": "Usage stats for a specific domain on a specific day",
+      "type": "object",
+      "properties": {
+        "domain": { "type": "string" },
+        "timeSpent": { "type": "number" },
+        "visits": { "type": "number" },
+        "category": { "type": "string", "enum": ["productive", "distracting", "neutral"] },
+        "lastVisited": { "type": "number" }
+      },
+      "required": ["domain", "timeSpent", "visits", "category", "lastVisited"]
+    },
+    "FocusSession": {
+      "title": "Focus Session",
+      "description": "A single focus session record",
+      "type": "object",
+      "properties": {
+        "startTime": { "type": "number" },
+        "duration": { "type": "number" },
+        "completed": { "type": "boolean" },
+        "distractionsBlocked": { "type": "number" }
+      },
+      "required": ["startTime", "duration", "completed"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profiles"
+    },
+    "/users/{userId}/history/{dayId}": {
+      "schema": "DayData",
+      "description": "Day-by-day historical metrics"
+    },
+    "/users/{userId}/history/{dayId}/sites/{siteId}": {
+      "schema": "SiteUsage",
+      "description": "Detailed site usage per day"
+    },
+    "/users/{userId}/sessions/{sessionId}": {
+      "schema": "FocusSession",
+      "description": "Recorded focus sessions"
+    }
+  }
+}
