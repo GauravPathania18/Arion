@@ -18,7 +18,7 @@ import ExtensionCode from './components/ExtensionCode';
 import { cn } from './lib/utils';
 import { ProductivityProvider, useProductivity } from './ProductivityContext';
 import { ThemeProvider } from './ThemeContext';
-import { signInWithGoogle, signOut } from './lib/firebase';
+import { signInWithGoogle, signOut } from './lib/supabase';
 import { generateSessionSummary } from './services/geminiService';
 import { PRODUCTIVE_SITES, DISTRACTING_SITES } from './constants';
 import Markdown from 'react-markdown';
@@ -251,12 +251,12 @@ function AppContent() {
         <div className="p-4 border-t border-arion-border space-y-4">
           <div className="flex items-center gap-3 px-2">
             <img 
-              src={user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName}`} 
+              src={user.user_metadata?.avatar_url || `https://ui-avatars.com/api/?name=${user.user_metadata?.full_name || 'User'}`} 
               alt="Avatar" 
               className="w-8 h-8 rounded-sm grayscale hover:grayscale-0 transition-all border border-arion-border/50"
             />
             <div className="flex-1 min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-widest truncate">{user.displayName}</p>
+              <p className="text-[10px] font-black uppercase tracking-widest truncate">{user.user_metadata?.full_name || user.email}</p>
               <button 
                 onClick={signOut}
                 className="text-[9px] text-arion-text-muted hover:text-red-500 uppercase font-bold tracking-tighter transition-colors"

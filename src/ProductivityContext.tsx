@@ -1,21 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { BehavioralMetrics, FocusSession, SiteUsage, DayData, UserSettings } from './types';
 import { TabEngagement, getSiteCategory } from './services/behavioralEngine';
-import { auth, db, handleFirestoreError, OperationType } from './lib/firebase';
-import { onAuthStateChanged, User } from 'firebase/auth';
+import { supabase, User } from './lib/supabase';
 import { PRODUCTIVE_SITES, DISTRACTING_SITES } from './constants';
-import { 
-  collection, 
-  doc, 
-  setDoc, 
-  getDoc, 
-  onSnapshot, 
-  query, 
-  orderBy, 
-  limit,
-  serverTimestamp,
-  updateDoc
-} from 'firebase/firestore';
 
 interface ProductivityContextType {
   // Current State
@@ -42,6 +29,7 @@ interface ProductivityContextType {
   recordSiteUsage: (site: string, duration: number) => void;
   updateMetrics: (updates: Partial<BehavioralMetrics>) => void;
   updateSettings: (updates: Partial<UserSettings>) => Promise<void>;
+  signOut: () => Promise<void>;
 }
 
 const ProductivityContext = createContext<ProductivityContextType | undefined>(undefined);
@@ -68,14 +56,20 @@ export function ProductivityProvider({ children }: { children: React.ReactNode }
 
   // Auth Listener
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
       setLoading(false);
     });
-    return () => unsubscribe();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      setLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  // Data Sync (Firestore -> State)
+  // Data Fetching and Subscriptions
   useEffect(() => {
     if (!user) {
       setHistory([]);
@@ -84,34 +78,92 @@ export function ProductivityProvider({ children }: { children: React.ReactNode }
     }
 
     const todayId = new Date().toISOString().split('T')[0];
-    const historyRef = collection(db, 'users', user.uid, 'history');
-    const sitesRef = collection(db, 'users', user.uid, 'history', todayId, 'sites');
 
-    // Sync History
-    const qHistory = query(historyRef, orderBy('date', 'desc'), limit(30));
-    const unsubHistory = onSnapshot(qHistory, (snapshot) => {
-      const data = snapshot.docs.map(doc => doc.data() as DayData);
-      setHistory(data);
-    }, (err) => handleFirestoreError(err, OperationType.LIST, `users/${user.uid}/history`));
-
-    // Sync Today's Sites
-    const unsubSites = onSnapshot(sitesRef, (snapshot) => {
-      const data = snapshot.docs.map(doc => doc.data() as SiteUsage);
-      setSiteUsage(data);
-    }, (err) => handleFirestoreError(err, OperationType.LIST, `users/${user.uid}/history/${todayId}/sites`));
-
-    // Sync Settings
-    const settingsRef = doc(db, 'users', user.uid, 'settings', 'config');
-    const unsubSettings = onSnapshot(settingsRef, (docSnap) => {
-      if (docSnap.exists()) {
-        setSettings(prev => ({ ...prev, ...docSnap.data() }));
+    async function fetchData() {
+      // Fetch History
+      const { data: historyData } = await supabase
+        .from('day_data')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('date', { ascending: false })
+        .limit(30);
+      
+      if (historyData) {
+        setHistory(historyData.map(d => ({
+          date: d.date,
+          totalActiveTime: d.total_active_time,
+          focusScore: d.focus_score,
+          sites: [] // Historical sites fetched on demand or kept empty for summary
+        })));
       }
-    }, (err) => handleFirestoreError(err, OperationType.GET, `users/${user.uid}/settings/config`));
+
+      // Fetch Today's Sites
+      const { data: sitesData } = await supabase
+        .from('site_usage')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('date', todayId);
+      
+      if (sitesData) {
+        setSiteUsage(sitesData.map(s => ({
+          domain: s.domain,
+          timeSpent: s.time_spent,
+          category: s.category,
+          visits: s.visits,
+          lastVisited: new Date(s.last_visited).getTime()
+        })));
+      }
+
+      // Fetch Settings
+      const { data: settingsData } = await supabase
+        .from('settings')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+      
+      if (settingsData) {
+        setSettings({
+          defaultSessionDuration: settingsData.default_session_duration,
+          blockedSites: settingsData.blocked_sites,
+          incognitoBlocker: settingsData.incognito_blocker,
+          notionToken: settingsData.notion_token,
+          notionDatabaseId: settingsData.notion_database_id
+        });
+      } else {
+        // Initialize settings if they don't exist
+        await supabase.from('settings').insert({
+          user_id: user.id,
+          default_session_duration: 25,
+          blocked_sites: [...DISTRACTING_SITES],
+          incognito_blocker: true
+        });
+      }
+    }
+
+    fetchData();
+
+    // Set up real-time subscriptions
+    const settingsChannel = supabase
+      .channel('settings-changes')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'settings',
+        filter: `user_id=eq.${user.id}`
+      }, (payload) => {
+        const newData = payload.new as any;
+        setSettings({
+          defaultSessionDuration: newData.default_session_duration,
+          blockedSites: newData.blocked_sites,
+          incognitoBlocker: newData.incognito_blocker,
+          notionToken: newData.notion_token,
+          notionDatabaseId: newData.notion_database_id
+        });
+      })
+      .subscribe();
 
     return () => {
-      unsubHistory();
-      unsubSites();
-      unsubSettings();
+      supabase.removeChannel(settingsChannel);
     };
   }, [user]);
 
@@ -121,7 +173,6 @@ export function ProductivityProvider({ children }: { children: React.ReactNode }
   const startSession = useCallback(async (duration: number) => {
     if (!user) return;
     
-    const sessionId = Date.now().toString();
     const session: FocusSession = {
       startTime: Date.now(),
       duration,
@@ -131,27 +182,29 @@ export function ProductivityProvider({ children }: { children: React.ReactNode }
 
     setActiveSession(session);
 
-    try {
-      await setDoc(doc(db, 'users', user.uid, 'sessions', sessionId), session);
-    } catch (err) {
-      handleFirestoreError(err, OperationType.CREATE, `users/${user.uid}/sessions/${sessionId}`);
-    }
+    await supabase.from('focus_sessions').insert({
+      user_id: user.id,
+      start_time: new Date(session.startTime).toISOString(),
+      duration: session.duration,
+      completed: session.completed,
+      distractions_blocked: session.distractionsBlocked
+    });
   }, [user]);
 
   const endSession = useCallback(async (completed: boolean) => {
     if (!activeSession || !user) return;
     
-    const sessionId = activeSession.startTime.toString();
-    const sessionRef = doc(db, 'users', user.uid, 'sessions', sessionId);
+    const startTimeStamp = new Date(activeSession.startTime).toISOString();
     const finishedSession = { ...activeSession, completed };
 
-    try {
-      await updateDoc(sessionRef, { completed });
-      setLastFinishedSession(finishedSession);
-      setActiveSession(null);
-    } catch (err) {
-      handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}/sessions/${sessionId}`);
-    }
+    await supabase
+      .from('focus_sessions')
+      .update({ completed })
+      .eq('user_id', user.id)
+      .eq('start_time', startTimeStamp);
+
+    setLastFinishedSession(finishedSession);
+    setActiveSession(null);
   }, [activeSession, user]);
 
   const clearFinishedSession = useCallback(() => {
@@ -166,47 +219,94 @@ export function ProductivityProvider({ children }: { children: React.ReactNode }
     if (!user) return;
     
     const todayId = new Date().toISOString().split('T')[0];
-    const siteId = site.replace(/\./g, '_'); // Safe ID
-    const siteRef = doc(db, 'users', user.uid, 'history', todayId, 'sites', siteId);
     const category = getSiteCategory(site);
 
-    try {
-      const existingDoc = await getDoc(siteRef);
-      if (existingDoc.exists()) {
-        const data = existingDoc.data() as SiteUsage;
-        await updateDoc(siteRef, {
-          timeSpent: data.timeSpent + duration,
-          visits: data.visits + 1,
-          lastVisited: Date.now()
-        });
-      } else {
-        await setDoc(siteRef, {
-          domain: site,
-          timeSpent: duration,
-          category: category,
-          visits: 1,
-          lastVisited: Date.now()
-        });
-      }
-      
-      // Update DayData summary
-      const dayRef = doc(db, 'users', user.uid, 'history', todayId);
-      const dayDoc = await getDoc(dayRef);
-      
-      if (dayDoc.exists()) {
-        const dayData = dayDoc.data();
-        await updateDoc(dayRef, {
-          totalActiveTime: (dayData.totalActiveTime || 0) + duration
-        });
-      } else {
-        await setDoc(dayRef, {
-          date: todayId,
-          totalActiveTime: duration,
-          focusScore: 70
-        });
-      }
-    } catch (err) {
-      handleFirestoreError(err, OperationType.WRITE, `users/${user.uid}/history/${todayId}/sites/${siteId}`);
+    // Update Site Usage
+    const { data: existingSite } = await supabase
+      .from('site_usage')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('date', todayId)
+      .eq('domain', site)
+      .single();
+
+    if (existingSite) {
+      await supabase
+        .from('site_usage')
+        .update({
+          time_spent: existingSite.time_spent + duration,
+          visits: existingSite.visits + 1,
+          last_visited: new Date().toISOString()
+        })
+        .eq('id', existingSite.id);
+    } else {
+      await supabase.from('site_usage').insert({
+        user_id: user.id,
+        date: todayId,
+        domain: site,
+        time_spent: duration,
+        category: category,
+        visits: 1,
+        last_visited: new Date().toISOString()
+      });
+    }
+
+    // Refresh site usage state for today
+    const { data: todaySites } = await supabase
+      .from('site_usage')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('date', todayId);
+    
+    if (todaySites) {
+      setSiteUsage(todaySites.map(s => ({
+        domain: s.domain,
+        timeSpent: s.time_spent,
+        category: s.category,
+        visits: s.visits,
+        lastVisited: new Date(s.last_visited).getTime()
+      })));
+    }
+
+    // Update Day Data summary
+    const { data: dayData } = await supabase
+      .from('day_data')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('date', todayId)
+      .single();
+
+    if (dayData) {
+      await supabase
+        .from('day_data')
+        .update({
+          total_active_time: (dayData.total_active_time || 0) + duration
+        })
+        .eq('id', dayData.id);
+    } else {
+      await supabase.from('day_data').insert({
+        user_id: user.id,
+        date: todayId,
+        total_active_time: duration,
+        focus_score: 70
+      });
+    }
+
+    // Refresh history
+    const { data: historyData } = await supabase
+      .from('day_data')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('date', { ascending: false })
+      .limit(30);
+    
+    if (historyData) {
+      setHistory(historyData.map(d => ({
+        date: d.date,
+        totalActiveTime: d.total_active_time,
+        focusScore: d.focus_score,
+        sites: [] 
+      })));
     }
   }, [user]);
 
@@ -216,14 +316,25 @@ export function ProductivityProvider({ children }: { children: React.ReactNode }
 
   const updateSettings = useCallback(async (updates: Partial<UserSettings>) => {
     if (!user) return;
-    const settingsRef = doc(db, 'users', user.uid, 'settings', 'config');
-    try {
-      await setDoc(settingsRef, updates, { merge: true });
-      setSettings(prev => ({ ...prev, ...updates }));
-    } catch (err) {
-      handleFirestoreError(err, OperationType.WRITE, `users/${user.uid}/settings/config`);
-    }
+    
+    const dbUpdates: any = {};
+    if (updates.defaultSessionDuration !== undefined) dbUpdates.default_session_duration = updates.defaultSessionDuration;
+    if (updates.blockedSites !== undefined) dbUpdates.blocked_sites = updates.blockedSites;
+    if (updates.incognitoBlocker !== undefined) dbUpdates.incognito_blocker = updates.incognitoBlocker;
+    if (updates.notionToken !== undefined) dbUpdates.notion_token = updates.notionToken;
+    if (updates.notionDatabaseId !== undefined) dbUpdates.notion_database_id = updates.notionDatabaseId;
+
+    await supabase
+      .from('settings')
+      .update(dbUpdates)
+      .eq('user_id', user.id);
+    
+    setSettings(prev => ({ ...prev, ...updates }));
   }, [user]);
+
+  const signOut = useCallback(async () => {
+    await supabase.auth.signOut();
+  }, []);
 
   return (
     <ProductivityContext.Provider value={{
@@ -245,7 +356,8 @@ export function ProductivityProvider({ children }: { children: React.ReactNode }
       recordEngagment,
       recordSiteUsage,
       updateMetrics,
-      updateSettings
+      updateSettings,
+      signOut
     }}>
       {children}
     </ProductivityContext.Provider>
